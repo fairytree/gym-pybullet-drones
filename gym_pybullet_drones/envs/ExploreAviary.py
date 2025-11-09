@@ -3,8 +3,8 @@ import numpy as np
 from gym_pybullet_drones.envs.BaseRLAviary import BaseRLAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType
 
-class HoverAviary(BaseRLAviary):
-    """Single agent RL problem: hover at position."""
+class ExploreAviary(BaseRLAviary):
+    """Single agent RL problem: Explore a predefined area."""
 
     ################################################################################
     
@@ -48,8 +48,17 @@ class HoverAviary(BaseRLAviary):
             The type of action space (1 or 3D; RPMS, thurst and torques, or waypoint with PID control)
 
         """
-        self.TARGET_POS = np.array([0,0,1])
-        self.EPISODE_LEN_SEC = 8
+        # self.TARGET_POS = np.array([0,0,1])
+        self.bounds = np.array([[-1.5, 1.5],   # X min/max
+                        [-1.5, 1.5],   # Y min/max
+                        [0.5, 2.0]])   # Z min/max
+        self.visited = set()
+        self.grid_size = 0.2  # discretization step in meters
+
+        self.EPISODE_LEN_SEC = 12
+
+        self.obstacles = [(np.array([0.5, 0.0, 1.0]), 0.3)]  # Define a pseudo  obstacle (position, radius)
+
         super().__init__(drone_model=drone_model,
                          num_drones=1,
                          initial_xyzs=initial_xyzs,
@@ -72,11 +81,28 @@ class HoverAviary(BaseRLAviary):
         -------
         float
             The reward.
-
         """
+
         state = self._getDroneStateVector(0)
-        ret = max(0, 2 - np.linalg.norm(self.TARGET_POS-state[0:3])**2)
-        return ret
+        pos = tuple(np.round(state[0:3] / self.grid_size).astype(int))
+        reward = 0
+
+        # reward for visiting new cells
+        if pos not in self.visited:
+            reward += 1.0
+            self.visited.add(pos)
+
+        # small penalty for leaving bounds
+        if np.any(state[0:3] < self.bounds[:,0]) or np.any(state[0:3] > self.bounds[:,1]):
+            reward -= 0.5
+
+        # penalty for collisions
+        for obs_pos, obs_radius in self.obstacles:
+            dist = np.linalg.norm(state[0:3] - obs_pos)
+            if dist < obs_radius + 0.2:  # safety buffer (m)
+                reward -= 1.0
+
+        return reward
 
     ################################################################################
     
@@ -89,32 +115,34 @@ class HoverAviary(BaseRLAviary):
             Whether the current episode is done.
 
         """
-        state = self._getDroneStateVector(0)
-        if np.linalg.norm(self.TARGET_POS-state[0:3]) < .0001:
-            return True
-        else:
-            return False
+        return False  # exploration continues until truncated
+
         
     ################################################################################
     
+
     def _computeTruncated(self):
-        """Computes the current truncated value.
-
-        Returns
-        -------
-        bool
-            Whether the current episode timed out.
-
-        """
+        """Truncate episode if out-of-bounds, collision, or time out."""
         state = self._getDroneStateVector(0)
-        if (abs(state[0]) > 1.5 or abs(state[1]) > 1.5 or state[2] > 2.0 # Truncate when the drone is too far away
-             or abs(state[7]) > .4 or abs(state[8]) > .4 # Truncate when the drone is too tilted
-        ):
-            return True
-        if self.step_counter/self.PYB_FREQ > self.EPISODE_LEN_SEC:
-            return True
-        else:
-            return False
+        x, y, z = state[0:3]
+
+        # Check if drone is out of bounds
+        out_of_bounds = (x < self.bounds[0,0]) or (x > self.bounds[0,1]) \
+                        or (y < self.bounds[1,0]) or (y > self.bounds[1,1]) \
+                        or (z < self.bounds[2,0]) or (z > self.bounds[2,1])
+
+        # Check if drone is tilted too much
+        tilted = abs(state[7]) > 0.4 or abs(state[8]) > 0.4
+
+        # Check collision with obstacles
+        collision = any(np.linalg.norm(state[0:3] - obs_pos) < obs_radius + 0.2
+                        for obs_pos, obs_radius in self.obstacles)
+
+        # Check timeout
+        timeout = self.step_counter / self.PYB_FREQ > self.EPISODE_LEN_SEC
+
+        return out_of_bounds or tilted or collision or timeout
+
 
     ################################################################################
     

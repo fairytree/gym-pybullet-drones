@@ -128,7 +128,7 @@ class BaseRLAviary(BaseAviary):
             pass
 
     ################################################################################
-
+    # !!! This is where the action_space is defined, i.e., what the output looks like.
     def _actionSpace(self):
         """Returns the action space of the environment.
 
@@ -156,7 +156,7 @@ class BaseRLAviary(BaseAviary):
         return spaces.Box(low=act_lower_bound, high=act_upper_bound, dtype=np.float32)
 
     ################################################################################
-
+    # !!! This function is to convert output of RL model to motors' RPM
     def _preprocessAction(self,
                           action
                           ):
@@ -256,7 +256,7 @@ class BaseRLAviary(BaseAviary):
         elif self.OBS_TYPE == ObservationType.KIN:
             ############################################################
             #### OBS SPACE OF SIZE 12
-            #### Observation vector ### X        Y        Z       Q1   Q2   Q3   Q4   R       P       Y       VX       VY       VZ       WX       WY       WZ
+            #### Observation vector ### X        Y        Z       Q1   Q2   Q3   Q4   R       P       Y       VX       VY       VZ       WX       WY       WZ (Q means quaternion, R is roll, P is pitch, Y is yaw)
             lo = -np.inf
             hi = np.inf
             obs_lower_bound = np.array([[lo,lo,0, lo,lo,lo,lo,lo,lo,lo,lo,lo] for i in range(self.NUM_DRONES)])
