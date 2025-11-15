@@ -1105,7 +1105,7 @@ class BaseAviary(gym.Env):
 
     ################################################################################
 
-    def _calculateNextStep(self, current_position, destination, step_size=1):
+    def _calculateNextStep(self, current_position, destination, step_size=0.1):
         """
         Calculates intermediate waypoint
         towards drone's destination

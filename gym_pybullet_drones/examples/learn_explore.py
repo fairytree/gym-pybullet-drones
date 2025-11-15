@@ -6,8 +6,8 @@ Example
 -------
 In a terminal, run as:
 
-    $ python learn.py --multiagent false
-    $ python learn.py --multiagent true
+    $ python learn_explore.py --multiagent false
+    $ python learn_explore.py --multiagent true
 
 Notes
 -----
@@ -39,7 +39,7 @@ DEFAULT_OUTPUT_FOLDER = 'results'
 DEFAULT_COLAB = False
 
 DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
-DEFAULT_ACT = ActionType('one_d_rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
+DEFAULT_ACT = ActionType('pid') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
 DEFAULT_AGENTS = 2
 DEFAULT_MA = False
 
@@ -78,7 +78,7 @@ def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_
     if DEFAULT_ACT == ActionType.ONE_D_RPM:
         target_reward = 474. if not multiagent else 949.5
     else:
-        target_reward = 467. if not multiagent else 920.
+        target_reward = 4000. if not multiagent else 9000.
     callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=target_reward,
                                                      verbose=1)
     eval_callback = EvalCallback(eval_env,

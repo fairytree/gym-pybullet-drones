@@ -48,16 +48,19 @@ class ExploreAviary(BaseRLAviary):
             The type of action space (1 or 3D; RPMS, thurst and torques, or waypoint with PID control)
 
         """
-        # self.TARGET_POS = np.array([0,0,1])
-        self.bounds = np.array([[-1.5, 1.5],   # X min/max
-                        [-1.5, 1.5],   # Y min/max
-                        [0.5, 2.0]])   # Z min/max
+
+        self.bounds = np.array([[-2, 2],        # X min/max
+                                [-2, 2],        # Y min/max
+                                [0.0, 2.0]])    # Z min/max
         self.visited = set()
         self.grid_size = 0.2  # discretization step in meters
 
         self.EPISODE_LEN_SEC = 12
 
-        self.obstacles = [(np.array([0.5, 0.0, 1.0]), 0.3)]  # Define a pseudo  obstacle (position, radius)
+        self.obstacles = [(np.array([[[1, 0, .1]]]), 0.3),
+        (np.array([[[0, 1, .1]]]), 0.3),
+        (np.array([[[-1, 0, .1]]]), 0.3),
+        (np.array([[[0, -1, .1]]]), 0.3)]  # Define a pseudo  obstacle (position, radius)
 
         super().__init__(drone_model=drone_model,
                          num_drones=1,
@@ -94,13 +97,13 @@ class ExploreAviary(BaseRLAviary):
 
         # small penalty for leaving bounds
         if np.any(state[0:3] < self.bounds[:,0]) or np.any(state[0:3] > self.bounds[:,1]):
-            reward -= 0.5
+            reward -= 0.01
 
         # penalty for collisions
         for obs_pos, obs_radius in self.obstacles:
             dist = np.linalg.norm(state[0:3] - obs_pos)
             if dist < obs_radius + 0.2:  # safety buffer (m)
-                reward -= 1.0
+                reward -= 0.1
 
         return reward
 

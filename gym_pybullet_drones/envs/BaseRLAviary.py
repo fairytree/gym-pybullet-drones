@@ -3,6 +3,7 @@ import numpy as np
 import pybullet as p
 from gymnasium import spaces
 from collections import deque
+import time
 
 from gym_pybullet_drones.envs.BaseAviary import BaseAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType, ImageType
@@ -93,39 +94,40 @@ class BaseRLAviary(BaseAviary):
         #### Set a limit on the maximum target speed ###############
         if act == ActionType.VEL:
             self.SPEED_LIMIT = 0.03 * self.MAX_SPEED_KMH * (1000/3600)
+        self._addObstacles()
 
     ################################################################################
 
     def _addObstacles(self):
         """Add obstacles to the environment.
-
-        Only if the observation is of type RGB, 4 landmarks are added.
         Overrides BaseAviary's method.
 
         """
-        if self.OBS_TYPE == ObservationType.RGB:
-            p.loadURDF("block.urdf",
-                       [1, 0, .1],
-                       p.getQuaternionFromEuler([0, 0, 0]),
-                       physicsClientId=self.CLIENT
-                       )
-            p.loadURDF("cube_small.urdf",
-                       [0, 1, .1],
-                       p.getQuaternionFromEuler([0, 0, 0]),
-                       physicsClientId=self.CLIENT
-                       )
-            p.loadURDF("duck_vhacd.urdf",
-                       [-1, 0, .1],
-                       p.getQuaternionFromEuler([0, 0, 0]),
-                       physicsClientId=self.CLIENT
-                       )
-            p.loadURDF("teddy_vhacd.urdf",
-                       [0, -1, .1],
-                       p.getQuaternionFromEuler([0, 0, 0]),
-                       physicsClientId=self.CLIENT
-                       )
-        else:
-            pass
+        scale = 6.0  # increase this number to make them bigger
+        p.loadURDF("block.urdf",
+                    [1, 0, .1],
+                    p.getQuaternionFromEuler([0, 0, 0]),
+                    globalScaling=scale,
+                    physicsClientId=self.CLIENT
+                    )
+        p.loadURDF("cube_small.urdf",
+                    [0, 1, .1],
+                    p.getQuaternionFromEuler([0, 0, 0]),
+                    globalScaling=scale,
+                    physicsClientId=self.CLIENT
+                    )
+        p.loadURDF("duck_vhacd.urdf",
+                    [-1, 0, .1],
+                    p.getQuaternionFromEuler([0, 0, 0]),
+                    globalScaling=scale,
+                    physicsClientId=self.CLIENT
+                    )
+        p.loadURDF("duck_vhacd.urdf",
+                    [0, -1, .1],
+                    p.getQuaternionFromEuler([0, 0, 0]),
+                    globalScaling=scale,
+                    physicsClientId=self.CLIENT
+                    )
 
     ################################################################################
     # !!! This is where the action_space is defined, i.e., what the output looks like.
@@ -195,7 +197,7 @@ class BaseRLAviary(BaseAviary):
                 next_pos = self._calculateNextStep(
                     current_position=state[0:3],
                     destination=target,
-                    step_size=1,
+                    step_size=0.1,
                     )
                 rpm_k, _, _ = self.ctrl[k].computeControl(control_timestep=self.CTRL_TIMESTEP,
                                                         cur_pos=state[0:3],
@@ -205,6 +207,16 @@ class BaseRLAviary(BaseAviary):
                                                         target_pos=next_pos
                                                         )
                 rpm[k,:] = rpm_k
+                current_time = time.time()
+                if not hasattr(self, 'last_print_time'):
+                    self.last_print_time = 0
+                if current_time - self.last_print_time >= 1.0:
+                    print("cur_pos:", np.round(state[0:3], 2),
+                    "target:", np.round(target, 2), 
+                    "Next pos:", np.round(next_pos, 2), 
+                    "rpm_k:", np.round(rpm[0,:], 2))
+                    self.last_print_time = current_time
+
             elif self.ACT_TYPE == ActionType.VEL:
                 state = self._getDroneStateVector(k)
                 if np.linalg.norm(target[0:3]) != 0:
@@ -311,6 +323,7 @@ class BaseRLAviary(BaseAviary):
             for i in range(self.NUM_DRONES):
                 #obs = self._clipAndNormalizeState(self._getDroneStateVector(i))
                 obs = self._getDroneStateVector(i)
+                # exclude the quaternion and keep (x, y, z, r, p, y, vx, vy, vz, wx, wy, wz)
                 obs_12[i, :] = np.hstack([obs[0:3], obs[7:10], obs[10:13], obs[13:16]]).reshape(12,)
             ret = np.array([obs_12[i, :] for i in range(self.NUM_DRONES)]).astype('float32')
             #### Add action buffer to observation #######################

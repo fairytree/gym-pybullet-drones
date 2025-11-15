@@ -47,6 +47,7 @@ def play(model_path=DEFAULT_MODEL_PATH, multiagent=DEFAULT_MA, gui=DEFAULT_GUI):
 
         obs2 = obs.squeeze()
         act2 = action.squeeze()
+        print("Step:", i, "Action:", action)
 
         if DEFAULT_OBS == ObservationType.KIN:
             if not multiagent:

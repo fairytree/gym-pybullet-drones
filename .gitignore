@@ -4,7 +4,7 @@ examples/debug.py
 examples/test.py
 
 # NumPy saves and videos
-results/
+# results/
 tmp/
 
 # Learning results
