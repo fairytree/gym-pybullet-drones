@@ -48,20 +48,11 @@ class ExploreAviary(BaseRLAviary):
             The type of action space (1 or 3D; RPMS, thurst and torques, or waypoint with PID control)
 
         """
-
-        self.bounds = np.array([[-2, 2],        # X min/max
-                                [-2, 2],        # Y min/max
-                                [0.0, 2.0]])    # Z min/max
         self.visited = set()
         self.grid_size = 0.2  # discretization step in meters
 
-        self.EPISODE_LEN_SEC = 12
-
-        self.obstacles = [(np.array([[[1, 0, .1]]]), 0.3),
-        (np.array([[[0, 1, .1]]]), 0.3),
-        (np.array([[[-1, 0, .1]]]), 0.3),
-        (np.array([[[0, -1, .1]]]), 0.3)]  # Define a pseudo  obstacle (position, radius)
-
+        self.EPISODE_LEN_SEC = 120
+        
         super().__init__(drone_model=drone_model,
                          num_drones=1,
                          initial_xyzs=initial_xyzs,
@@ -74,6 +65,13 @@ class ExploreAviary(BaseRLAviary):
                          obs=obs,
                          act=act
                          )
+
+        # Each obstacle: (center_position, half_extents)
+        self.obstacles = [
+            (np.array(obs["position"]), np.array(obs["size"]) / 2)
+            for obs in self.obstacles_info
+        ]
+        self.last_waypoint = np.array([0.0, 0.0, 0.0]) 
 
     ################################################################################
     
@@ -88,24 +86,55 @@ class ExploreAviary(BaseRLAviary):
 
         state = self._getDroneStateVector(0)
         pos = tuple(np.round(state[0:3] / self.grid_size).astype(int))
-        reward = 0
+        reward = 0.0
 
         # reward for visiting new cells
         if pos not in self.visited:
-            reward += 1.0
+            reward += 10.0
             self.visited.add(pos)
+        else:
+            reward -= 1  # penalty for revisiting
+        
+        # # add reward for reaching the target (Need to add distance_to_target info as state)
+        # distance_to_target = np.linalg.norm(state[0:3] - self.target)
+        # if distance_to_target < 0.2:
+        #     reward += 1000.0
 
-        # small penalty for leaving bounds
+        # Penalty for leaving bounds
         if np.any(state[0:3] < self.bounds[:,0]) or np.any(state[0:3] > self.bounds[:,1]):
             reward -= 0.01
 
-        # penalty for collisions
-        for obs_pos, obs_radius in self.obstacles:
-            dist = np.linalg.norm(state[0:3] - obs_pos)
-            if dist < obs_radius + 0.2:  # safety buffer (m)
+        # direction-change penalty
+        reward += self._direction_penalty(state[0:3], self.last_waypoint, self.current_waypoint)
+        self.last_waypoint = self.current_waypoint.copy()
+
+        # Penalty for collisions with obstacles (boxes)
+        for obs_pos, half_extents in self.obstacles:
+            obs_min = obs_pos - half_extents - 0.1  # small safety buffer
+            obs_max = obs_pos + half_extents + 0.1
+            if np.all(state[0:3] > obs_min) and np.all(state[0:3] < obs_max):
                 reward -= 0.1
 
         return reward
+
+    ################################################################################
+    
+    def _direction_penalty(self, current_pos, last_waypoint, current_waypoint):
+        v_prev = last_waypoint - current_pos
+        v_next = current_waypoint - current_pos
+
+        # avoid zero vectors
+        if np.linalg.norm(v_prev) < 1e-6 or np.linalg.norm(v_next) < 1e-6:
+            return 0.0
+
+        # dot product
+        dot = np.dot(v_prev, v_next)
+
+        if dot <= 0:
+            return -1  # penalty for reversal
+        else:
+            return 0.0
+
 
     ################################################################################
     
@@ -130,16 +159,22 @@ class ExploreAviary(BaseRLAviary):
         x, y, z = state[0:3]
 
         # Check if drone is out of bounds
-        out_of_bounds = (x < self.bounds[0,0]) or (x > self.bounds[0,1]) \
-                        or (y < self.bounds[1,0]) or (y > self.bounds[1,1]) \
-                        or (z < self.bounds[2,0]) or (z > self.bounds[2,1])
+        buffer = 0.5
+        out_of_bounds = (x < self.bounds[0,0] - buffer) or (x > self.bounds[0,1] + buffer) \
+                        or (y < self.bounds[1,0] - buffer) or (y > self.bounds[1,1] + buffer) \
+                        or (z < self.bounds[2,0] - buffer) or (z > self.bounds[2,1] + buffer)
 
         # Check if drone is tilted too much
         tilted = abs(state[7]) > 0.4 or abs(state[8]) > 0.4
 
-        # Check collision with obstacles
-        collision = any(np.linalg.norm(state[0:3] - obs_pos) < obs_radius + 0.2
-                        for obs_pos, obs_radius in self.obstacles)
+        # Check collision with obstacles (boxes)
+        collision = False
+        for obs_pos, half_extents in self.obstacles:
+            obs_min = obs_pos - half_extents - 0.1  # add small buffer
+            obs_max = obs_pos + half_extents + 0.1
+            if np.all(state[0:3] > obs_min) and np.all(state[0:3] < obs_max):
+                collision = True
+                break
 
         # Check timeout
         timeout = self.step_counter / self.PYB_FREQ > self.EPISODE_LEN_SEC

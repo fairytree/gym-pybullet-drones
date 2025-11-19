@@ -3,6 +3,7 @@ import time
 import argparse
 import numpy as np
 import gymnasium as gym
+import pybullet as p
 from stable_baselines3 import PPO
 from gym_pybullet_drones.envs.ExploreAviary import ExploreAviary
 from gym_pybullet_drones.envs.MultiHoverAviary import MultiHoverAviary
@@ -48,6 +49,8 @@ def play(model_path=DEFAULT_MODEL_PATH, multiagent=DEFAULT_MA, gui=DEFAULT_GUI):
         obs2 = obs.squeeze()
         act2 = action.squeeze()
 
+        print("action:", act2)
+
         if DEFAULT_OBS == ObservationType.KIN:
             if not multiagent:
                 logger.log(drone=0,
@@ -67,6 +70,18 @@ def play(model_path=DEFAULT_MODEL_PATH, multiagent=DEFAULT_MA, gui=DEFAULT_GUI):
                                          act2[d]]),
                         control=np.zeros(12))
 
+        # Update camera to slowly orbit
+        cam_info = p.getDebugVisualizerCamera(physicsClientId=env.CLIENT)
+        cam_distance = cam_info[10]  # current distance (can be zoomed with mouse)
+        speed = 0.05
+        yaw = -30 + i * speed        # adjust speed of rotation by changing speed variable
+        pitch = -30                  # keep pitch fixed
+        p.resetDebugVisualizerCamera(cameraDistance=cam_distance,
+                                    cameraYaw=yaw,
+                                    cameraPitch=pitch,
+                                    cameraTargetPosition=[0,0,0],
+                                    physicsClientId=env.CLIENT)
+                                    
         env.render()
         sync(i, start, env.CTRL_TIMESTEP)
         if terminated:

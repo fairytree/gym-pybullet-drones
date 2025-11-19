@@ -77,6 +77,12 @@ class BaseRLAviary(BaseAviary):
                 self.ctrl = [DSLPIDControl(drone_model=DroneModel.CF2X) for i in range(num_drones)]
             else:
                 print("[ERROR] in BaseRLAviary.__init()__, no controller is available for the specified drone_model")
+        self.obstacles_info = [{"position": [0,0,100], "size": [0.1,0.1,0.1]}]
+        self.target = np.array([0.0, 0.0, 0.0])
+        self.bounds = np.array([[-2, 2],        # X min/max
+                                [-2, 2],        # Y min/max
+                                [0.0, 2.0]])    # Z min/max
+        self.current_waypoint = np.array([0.0, 0.0, 0.0])
         super().__init__(drone_model=drone_model,
                          num_drones=num_drones,
                          neighbourhood_radius=neighbourhood_radius,
@@ -94,7 +100,6 @@ class BaseRLAviary(BaseAviary):
         #### Set a limit on the maximum target speed ###############
         if act == ActionType.VEL:
             self.SPEED_LIMIT = 0.03 * self.MAX_SPEED_KMH * (1000/3600)
-        self._addObstacles()
 
     ################################################################################
 
@@ -103,31 +108,52 @@ class BaseRLAviary(BaseAviary):
         Overrides BaseAviary's method.
 
         """
-        scale = 6.0  # increase this number to make them bigger
-        p.loadURDF("block.urdf",
-                    [1, 0, .1],
-                    p.getQuaternionFromEuler([0, 0, 0]),
-                    globalScaling=scale,
-                    physicsClientId=self.CLIENT
-                    )
-        p.loadURDF("cube_small.urdf",
-                    [0, 1, .1],
-                    p.getQuaternionFromEuler([0, 0, 0]),
-                    globalScaling=scale,
-                    physicsClientId=self.CLIENT
-                    )
+        walls = [
+            {"position": [1.0, 0.0, 0.25], "size": [0.5, 0.1, 0.5], "color": [0.8, 0.8, 0.8, 1.0]},
+            {"position": [-0.5, 0.5, 0.25], "size": [0.1, 2.0, 0.5], "color": [1.0, 0.5, 0.5, 1.0]},
+            {"position": [-2.5, 0.0, 0.25], "size": [1.5, 0.25, 0.5], "color": [0.3, 0.9, 0.3, 1.0]},
+            {"position": [-1.5, -1.0, 0.125], "size": [0.25, 0.5, 0.25], "color": [0.5, 0.5, 1.0, 1.0]}
+        ]
+
+        for wall in walls:
+            self.create_wall(position=wall["position"], size=wall["size"], color=wall["color"])
+            self.obstacles_info.append({"position": wall["position"], "size": wall["size"]})
+
+        self.target = np.array([-1.8, -1.0, .1])
         p.loadURDF("duck_vhacd.urdf",
-                    [-1, 0, .1],
-                    p.getQuaternionFromEuler([0, 0, 0]),
-                    globalScaling=scale,
-                    physicsClientId=self.CLIENT
-                    )
-        p.loadURDF("duck_vhacd.urdf",
-                    [0, -1, .1],
-                    p.getQuaternionFromEuler([0, 0, 0]),
-                    globalScaling=scale,
-                    physicsClientId=self.CLIENT
-                    )
+            self.target,
+            p.getQuaternionFromEuler([0, 0, 0]),
+            globalScaling=2.0,
+            physicsClientId=self.CLIENT
+            )
+
+    def create_wall(self, position, size, color=[1, 1, 1, 1], mass=0):
+        """Create a box-shaped wall in the environment."""
+        
+        half_extents = [size[0] / 2, size[1] / 2, size[2] / 2]
+
+        collision = p.createCollisionShape(
+            p.GEOM_BOX,
+            halfExtents=half_extents,
+            physicsClientId=self.CLIENT
+        )
+
+        visual = p.createVisualShape(
+            p.GEOM_BOX,
+            halfExtents=half_extents,
+            rgbaColor=color,
+            physicsClientId=self.CLIENT
+        )
+
+        wall_id = p.createMultiBody(
+            baseMass=mass,
+            baseCollisionShapeIndex=collision,
+            baseVisualShapeIndex=visual,
+            basePosition=position,
+            physicsClientId=self.CLIENT
+        )
+
+        return wall_id
 
     ################################################################################
     # !!! This is where the action_space is defined, i.e., what the output looks like.
@@ -193,6 +219,8 @@ class BaseRLAviary(BaseAviary):
             if self.ACT_TYPE == ActionType.RPM:
                 rpm[k,:] = np.array(self.HOVER_RPM * (1+0.05*target))
             elif self.ACT_TYPE == ActionType.PID:
+                target = self._scale_waypoint(target, self.bounds)
+                self.current_waypoint = target.copy()
                 state = self._getDroneStateVector(k)
                 next_pos = self._calculateNextStep(
                     current_position=state[0:3],
@@ -252,6 +280,18 @@ class BaseRLAviary(BaseAviary):
 
     ################################################################################
 
+    def _scale_waypoint(self, rl_output, bounds):
+        """
+        Scale RL network output from [-1,1] to environment bounds.
+        
+        rl_output: np.array of shape (3,) in [-1,1] for x,y,z
+        bounds: np.array shape (3,2) [[x_min,x_max],[y_min,y_max],[z_min,z_max]]
+        
+        Returns: np.array shape (3,) waypoint in real environment
+        """
+        return bounds[:, 0] + (rl_output + 1.0) * 0.5 * (bounds[:, 1] - bounds[:, 0])
+
+    
     def _observationSpace(self):
         """Returns the observation space of the environment.
 

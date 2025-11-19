@@ -69,10 +69,17 @@ def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_
     print('[INFO] Observation space:', train_env.observation_space)
 
     #### Train the model #######################################
-    model = PPO('MlpPolicy',
-                train_env,
-                # tensorboard_log=filename+'/tb/',
-                verbose=1)
+    model = PPO(
+        'MlpPolicy',
+        train_env,
+        # n_steps=1024,  # default is 2048, reduce for faster exploration
+        # gamma=0.95,  # default discount rate is 0.99, reduce to care more about immediate reward
+        ent_coef=0.03,  # encourages stochasticity in the policy
+        # learning_rate=5e-4,  # default is 3e-4
+        verbose=1,
+        policy_kwargs=dict(net_arch=[256,256, 128]) # larger network to handle more complex tasks
+    )
+
 
     #### Target cumulative rewards (problem-dependent) ##########
     if DEFAULT_ACT == ActionType.ONE_D_RPM:
