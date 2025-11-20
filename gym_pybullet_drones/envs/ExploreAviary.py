@@ -93,8 +93,8 @@ class ExploreAviary(BaseRLAviary):
             reward += 10.0
             self.visited.add(pos)
         else:
-            reward -= 1  # penalty for revisiting
-        
+            reward -= 0.1  # penalty for revisiting, try smaller penalty if too harsh
+
         # # add reward for reaching the target (Need to add distance_to_target info as state)
         # distance_to_target = np.linalg.norm(state[0:3] - self.target)
         # if distance_to_target < 0.2:
@@ -113,7 +113,7 @@ class ExploreAviary(BaseRLAviary):
             obs_min = obs_pos - half_extents - 0.1  # small safety buffer
             obs_max = obs_pos + half_extents + 0.1
             if np.all(state[0:3] > obs_min) and np.all(state[0:3] < obs_max):
-                reward -= 0.1
+                reward -= 100
 
         return reward
 

@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 import gymnasium as gym
 import pybullet as p
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, TD3
 from gym_pybullet_drones.envs.ExploreAviary import ExploreAviary
 from gym_pybullet_drones.envs.MultiHoverAviary import MultiHoverAviary
 from gym_pybullet_drones.utils.enums import ObservationType, ActionType
@@ -14,18 +14,27 @@ from gym_pybullet_drones.utils.utils import sync, str2bool
 DEFAULT_MODEL_PATH = "results/best_model.zip"
 DEFAULT_GUI = True
 DEFAULT_OBS = ObservationType('kin')
-DEFAULT_ACT = ActionType('pid') # 1) 'rpm' for RL to output rpm directly or 2) 'pid' for RL to output waypoints to be tracked by a PID controller
+DEFAULT_ACT = ActionType('pid')  # 'rpm' for RL to output rpm directly or 'pid' for RL to output waypoints tracked by PID
 DEFAULT_AGENTS = 2
 DEFAULT_MA = False
+DEFAULT_ALGO = "PPO"  # "PPO" or "TD3"
 
-def play(model_path=DEFAULT_MODEL_PATH, multiagent=DEFAULT_MA, gui=DEFAULT_GUI):
+def play(model_path=DEFAULT_MODEL_PATH, algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, gui=DEFAULT_GUI):
     #### Load saved model ####
     if not os.path.isfile(model_path):
         print(f"[ERROR] Model file not found at: {model_path}")
         return
 
-    model = PPO.load(model_path)
-    print(f"[INFO] Loaded model from {model_path}")
+    if algo.upper() == "PPO":
+        model_class = PPO
+    elif algo.upper() == "TD3":
+        model_class = TD3
+    else:
+        print(f"[ERROR] Unsupported algorithm: {algo}. Choose 'PPO' or 'TD3'.")
+        return
+
+    model = model_class.load(model_path)
+    print(f"[INFO] Loaded {algo.upper()} model from {model_path}")
 
     #### Create test environment ####
     if not multiagent:
@@ -91,8 +100,9 @@ def play(model_path=DEFAULT_MODEL_PATH, multiagent=DEFAULT_MA, gui=DEFAULT_GUI):
     logger.plot()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run a trained PPO policy in PyBullet drones environment.")
+    parser = argparse.ArgumentParser(description="Run a trained RL policy in PyBullet drones environment.")
     parser.add_argument('--model_path', type=str, default=DEFAULT_MODEL_PATH, help='Path to saved policy zip file')
+    parser.add_argument('--algo', type=str, default=DEFAULT_ALGO, help="Algorithm: 'PPO' or 'TD3'")
     parser.add_argument('--multiagent', type=bool, default=DEFAULT_MA, help='Whether to use MultiHoverAviary')
     parser.add_argument('--gui', type=bool, default=DEFAULT_GUI, help='Enable GUI rendering')
     args = parser.parse_args()

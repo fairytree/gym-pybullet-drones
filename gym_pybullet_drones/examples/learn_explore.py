@@ -22,7 +22,7 @@ import argparse
 import gymnasium as gym
 import numpy as np
 import torch
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, TD3
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -32,18 +32,21 @@ from gym_pybullet_drones.envs.ExploreAviary import ExploreAviary
 from gym_pybullet_drones.envs.MultiHoverAviary import MultiHoverAviary
 from gym_pybullet_drones.utils.utils import sync, str2bool
 from gym_pybullet_drones.utils.enums import ObservationType, ActionType
+from stable_baselines3.common.noise import NormalActionNoise
+
 
 DEFAULT_GUI = True
 DEFAULT_RECORD_VIDEO = False
 DEFAULT_OUTPUT_FOLDER = 'results'
 DEFAULT_COLAB = False
+DEFAULT_ALGO = "PPO" # "PPO" or "TD3"
 
 DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
 DEFAULT_ACT = ActionType('pid') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
 DEFAULT_AGENTS = 2
 DEFAULT_MA = False
 
-def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=DEFAULT_COLAB, record_video=DEFAULT_RECORD_VIDEO, local=True):
+def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=DEFAULT_COLAB, record_video=DEFAULT_RECORD_VIDEO, local=True):
 
     filename = os.path.join(output_folder, 'save-'+datetime.now().strftime("%m.%d.%Y_%H.%M.%S"))
     if not os.path.exists(filename):
@@ -69,17 +72,33 @@ def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_
     print('[INFO] Observation space:', train_env.observation_space)
 
     #### Train the model #######################################
-    model = PPO(
-        'MlpPolicy',
-        train_env,
-        # n_steps=1024,  # default is 2048, reduce for faster exploration
-        # gamma=0.95,  # default discount rate is 0.99, reduce to care more about immediate reward
-        ent_coef=0.03,  # encourages stochasticity in the policy
-        # learning_rate=5e-4,  # default is 3e-4
-        verbose=1,
-        policy_kwargs=dict(net_arch=[256,256, 128]) # larger network to handle more complex tasks
-    )
+    n_actions = train_env.action_space.shape[-1]
+    action_noise = NormalActionNoise(mean=np.zeros(n_actions), sigma=0.1 * np.ones(n_actions))
 
+    algo = algo.upper()
+    if algo == "PPO":
+        model = PPO(
+            'MlpPolicy',
+            train_env,
+            ent_coef=0.05,
+            verbose=1,
+            policy_kwargs=dict(net_arch=[256,256,128])
+        )
+    elif algo == "TD3":
+        model = TD3(
+            "MlpPolicy",
+            train_env,
+            verbose=1,
+            policy_kwargs=dict(net_arch=[256,256,128]),
+            action_noise=action_noise,
+            buffer_size=100000,
+            learning_starts=1000,
+            batch_size=256,
+            tau=0.005,
+            gamma=0.99
+        )
+    else:
+        raise ValueError(f"[ERROR] Unsupported algorithm: {algo}. Choose 'PPO' or 'TD3'.")
 
     #### Target cumulative rewards (problem-dependent) ##########
     if DEFAULT_ACT == ActionType.ONE_D_RPM:
@@ -124,7 +143,7 @@ def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_
         path = filename+'/best_model.zip'
     else:
         print("[ERROR]: no model under the specified path", filename)
-    model = PPO.load(path)
+    model = PPO.load(path) if algo=="PPO" else TD3.load(path)
 
     #### Show (and record a video of) the model's performance ##
     if not multiagent:
@@ -156,7 +175,7 @@ def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_
     start = time.time()
     for i in range((test_env.EPISODE_LEN_SEC+2)*test_env.CTRL_FREQ):
         action, _states = model.predict(obs,
-                                        deterministic=True
+                                        deterministic=False
                                         )
         obs, reward, terminated, truncated, info = test_env.step(action)
         obs2 = obs.squeeze()
@@ -197,6 +216,7 @@ def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_
 if __name__ == '__main__':
     #### Define and parse (optional) arguments for the script ##
     parser = argparse.ArgumentParser(description='Single agent reinforcement learning example script')
+    parser.add_argument('--algo', default=DEFAULT_ALGO, type=str, help="Algorithm: 'PPO' or 'TD3'")
     parser.add_argument('--multiagent',         default=DEFAULT_MA,            type=str2bool,      help='Whether to use example LeaderFollower instead of Hover (default: False)', metavar='')
     parser.add_argument('--gui',                default=DEFAULT_GUI,           type=str2bool,      help='Whether to use PyBullet GUI (default: True)', metavar='')
     parser.add_argument('--record_video',       default=DEFAULT_RECORD_VIDEO,  type=str2bool,      help='Whether to record a video (default: False)', metavar='')

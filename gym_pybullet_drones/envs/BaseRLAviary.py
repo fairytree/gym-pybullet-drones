@@ -291,7 +291,8 @@ class BaseRLAviary(BaseAviary):
         """
         return bounds[:, 0] + (rl_output + 1.0) * 0.5 * (bounds[:, 1] - bounds[:, 0])
 
-    
+    ################################################################################
+    # !!! this is to construct the observation space
     def _observationSpace(self):
         """Returns the observation space of the environment.
 
