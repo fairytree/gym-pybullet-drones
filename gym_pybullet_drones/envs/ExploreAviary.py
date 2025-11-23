@@ -87,18 +87,21 @@ class ExploreAviary(BaseRLAviary):
         state = self._getDroneStateVector(0)
         pos = tuple(np.round(state[0:3] / self.grid_size).astype(int))
         reward = 0.0
+        
+        #penalty for existing
+        reward += -0.01
 
         # reward for visiting new cells
-        if pos not in self.visited:
-            reward += 10.0
-            self.visited.add(pos)
-        else:
-            reward -= 0.1  # penalty for revisiting, try smaller penalty if too harsh
+        # if pos not in self.visited:
+        #     reward += 10.0
+        #     self.visited.add(pos)
+        # else:
+        #     reward -= 0.1  # penalty for revisiting, try smaller penalty if too harsh
 
-        # # add reward for reaching the target (Need to add distance_to_target info as state)
-        # distance_to_target = np.linalg.norm(state[0:3] - self.target)
-        # if distance_to_target < 0.2:
-        #     reward += 1000.0
+        # add reward for reaching the target (Need to add distance_to_target info as state)
+        distance_to_target = np.linalg.norm(state[0:3] - self.target)
+        if distance_to_target < 0.2:
+            reward += 1000.0
 
         # Penalty for leaving bounds
         if np.any(state[0:3] < self.bounds[:,0]) or np.any(state[0:3] > self.bounds[:,1]):
@@ -147,7 +150,15 @@ class ExploreAviary(BaseRLAviary):
             Whether the current episode is done.
 
         """
-        return False  # exploration continues until truncated
+
+        # check if drone is at the target
+        state = self._getDroneStateVector(0)
+        distance_to_target = np.linalg.norm(state[0:3] - self.target)
+        if distance_to_target < 0.2:
+            done=True
+        else: done = False
+
+        return done  # exploration continues until truncated
 
         
     ################################################################################

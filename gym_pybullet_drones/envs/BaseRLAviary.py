@@ -119,12 +119,21 @@ class BaseRLAviary(BaseAviary):
             self.create_wall(position=wall["position"], size=wall["size"], color=wall["color"])
             self.obstacles_info.append({"position": wall["position"], "size": wall["size"]})
 
-        self.target = np.array([-1.8, -1.0, .1])
-        p.loadURDF("duck_vhacd.urdf",
+
+        #currently putting target at origin
+        #self.target = np.array([-1.8, -1.0, .1])
+        self.target = np.array([0, 0.5, .1])
+        duck = p.loadURDF("duck_vhacd.urdf",
             self.target,
             p.getQuaternionFromEuler([0, 0, 0]),
             globalScaling=2.0,
             physicsClientId=self.CLIENT
+            )
+        p.changeVisualShape(
+            duck,
+            linkIndex=-1,        # -1 usually means “base link”
+            rgbaColor=[0.3, 1.0, 0.0, 1.0],
+            specularColor=[0.5, 1.0, 0.5]
             )
 
     def create_wall(self, position, size, color=[1, 1, 1, 1], mass=0):
