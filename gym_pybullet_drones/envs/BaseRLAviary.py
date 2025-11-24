@@ -122,9 +122,9 @@ class BaseRLAviary(BaseAviary):
 
         #currently putting target at origin
         #self.target = np.array([-1.8, -1.0, .1])
-        self.target = np.array([0., 0.5, .1])
+        self.emmit_target = np.array([0., 0.5, .1])
         duck = p.loadURDF("duck_vhacd.urdf",
-            self.target,
+            self.emmit_target,
             p.getQuaternionFromEuler([0, 0, 0]),
             globalScaling=2.0,
             physicsClientId=self.CLIENT
@@ -226,7 +226,7 @@ class BaseRLAviary(BaseAviary):
 
         """
         self.action_buffer.append(action)
-        action = action[:-1]
+        action = action[:,:-1]
         rpm = np.zeros((self.NUM_DRONES,4))
         for k in range(action.shape[0]):
             target = action[k, :]

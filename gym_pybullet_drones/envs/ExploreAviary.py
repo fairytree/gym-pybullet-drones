@@ -51,7 +51,7 @@ class ExploreAviary(BaseRLAviary):
         self.visited = set()
         self.grid_size = 0.2  # discretization step in meters
 
-        self.EPISODE_LEN_SEC = 120
+        self.EPISODE_LEN_SEC = 40
         
         super().__init__(drone_model=drone_model,
                          num_drones=1,
@@ -92,20 +92,20 @@ class ExploreAviary(BaseRLAviary):
         reward += -0.01
 
         # reward for visiting new cells
-        # if pos not in self.visited:
-        #     reward += 10.0
-        #     self.visited.add(pos)
-        # else:
-        #     reward -= 0.1  # penalty for revisiting, try smaller penalty if too harsh
+        if pos not in self.visited:
+            reward += 10.0
+            self.visited.add(pos)
+        else:
+            reward -= 0.1  # penalty for revisiting, try smaller penalty if too harsh
 
         # add reward for reaching the target (Need to add distance_to_target info as state)
-        distance_to_target = np.linalg.norm(state[0:3] - self.target)
+        distance_to_target = np.linalg.norm(state[0:3] - self.emmit_target)
         if distance_to_target < 0.2:
             reward += 1000.0
 
         # Penalty for leaving bounds
         if np.any(state[0:3] < self.bounds[:,0]) or np.any(state[0:3] > self.bounds[:,1]):
-            reward -= 0.01
+            reward -= 0.1
 
         # direction-change penalty
         reward += self._direction_penalty(state[0:3], self.last_waypoint, self.current_waypoint)
@@ -153,7 +153,7 @@ class ExploreAviary(BaseRLAviary):
 
         # check if drone is at the target
         state = self._getDroneStateVector(0)
-        distance_to_target = np.linalg.norm(state[0:3] - self.target)
+        distance_to_target = np.linalg.norm(state[0:3] - self.emmit_target)
         if distance_to_target < 0.2:
             done=True
         else: done = False
