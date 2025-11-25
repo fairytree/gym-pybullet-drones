@@ -21,11 +21,12 @@ from datetime import datetime
 import argparse
 import gymnasium as gym
 import numpy as np
-import torch
+# import torch
 from stable_baselines3 import PPO, TD3
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.monitor import Monitor
 
 from gym_pybullet_drones.utils.Logger import Logger
 from gym_pybullet_drones.envs.ExploreAviary import ExploreAviary
@@ -39,14 +40,23 @@ DEFAULT_GUI = True
 DEFAULT_RECORD_VIDEO = False
 DEFAULT_OUTPUT_FOLDER = 'results'
 DEFAULT_COLAB = False
-DEFAULT_ALGO = "PPO" # "PPO" or "TD3"
-
 DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
-DEFAULT_ACT = ActionType('pid') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
 DEFAULT_AGENTS = 2
 DEFAULT_MA = False
 
-def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=DEFAULT_COLAB, record_video=DEFAULT_RECORD_VIDEO, local=True):
+DEFAULT_ALGO = "PPO" # "PPO" or "TD3" RL algorithm
+DEFAULT_ACT = ActionType('pid') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
+DEFAULT_INCENTIVE_OPTIONS = {
+    "new_voxel_reward": True, # Reward for exploring a new voxel
+    "out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
+    "change_direction_penalty": True, # Penalty for changing direction abruptly
+    "collision_penalty": True, # Penalty for colliding with obstacles
+    "time_penalty": True, # Penalty for time taken to encourage faster exploration
+    # "exploration_percentage": True, # provide additional observation of percentage explored
+    # "nearest_unexplored_voxel": True # provide additional observation of position of nearest unexplored voxel
+}
+
+def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=DEFAULT_COLAB, record_video=DEFAULT_RECORD_VIDEO, local=True, incentive_options=DEFAULT_INCENTIVE_OPTIONS):
 
     filename = os.path.join(output_folder, 'save-'+datetime.now().strftime("%m.%d.%Y_%H.%M.%S"))
     if not os.path.exists(filename):
@@ -54,11 +64,11 @@ def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_F
 
     if not multiagent:
         train_env = make_vec_env(ExploreAviary,
-                                 env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT),
+                                 env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT,incentive_options=incentive_options),
                                  n_envs=1,
                                  seed=0
                                  )
-        eval_env = ExploreAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+        eval_env = ExploreAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, incentive_options=incentive_options)
     else:
         train_env = make_vec_env(MultiHoverAviary,
                                  env_kwargs=dict(num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT),
@@ -147,18 +157,18 @@ def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_F
 
     #### Show (and record a video of) the model's performance ##
     if not multiagent:
-        test_env = ExploreAviary(gui=gui,
+        test_env = Monitor(ExploreAviary(gui=gui,
                                obs=DEFAULT_OBS,
                                act=DEFAULT_ACT,
-                               record=record_video)
-        test_env_nogui = ExploreAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+                               record=record_video,incentive_options=incentive_options))
+        test_env_nogui = Monitor(ExploreAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT,incentive_options=incentive_options))
     else:
-        test_env = MultiHoverAviary(gui=gui,
+        test_env = Monitor(MultiHoverAviary(gui=gui,
                                         num_drones=DEFAULT_AGENTS,
                                         obs=DEFAULT_OBS,
                                         act=DEFAULT_ACT,
-                                        record=record_video)
-        test_env_nogui = MultiHoverAviary(num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT)
+                                        record=record_video))
+        test_env_nogui = Monitor(MultiHoverAviary(num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT))
     logger = Logger(logging_freq_hz=int(test_env.CTRL_FREQ),
                 num_drones=DEFAULT_AGENTS if multiagent else 1,
                 output_folder=output_folder,

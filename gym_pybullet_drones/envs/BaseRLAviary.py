@@ -26,7 +26,8 @@ class BaseRLAviary(BaseAviary):
                  gui=False,
                  record=False,
                  obs: ObservationType=ObservationType.KIN,
-                 act: ActionType=ActionType.RPM
+                 act: ActionType=ActionType.RPM,
+                 incentive_options: dict=None
                  ):
         """Initialization of a generic single and multi-agent RL environment.
 
@@ -83,6 +84,8 @@ class BaseRLAviary(BaseAviary):
                                 [-2, 2],        # Y min/max
                                 [0.0, 2.0]])    # Z min/max
         self.current_waypoint = np.array([0.0, 0.0, 0.0])
+        self.incentive_options = incentive_options
+
         super().__init__(drone_model=drone_model,
                          num_drones=num_drones,
                          neighbourhood_radius=neighbourhood_radius,
@@ -220,8 +223,9 @@ class BaseRLAviary(BaseAviary):
                 rpm[k,:] = np.array(self.HOVER_RPM * (1+0.05*target))
             elif self.ACT_TYPE == ActionType.PID:
                 target = self._scale_waypoint(target, self.bounds)
-                self.current_waypoint = target.copy()
                 state = self._getDroneStateVector(k)
+                # target = state[0:3] + target[0:3]
+                self.current_waypoint = target.copy()
                 next_pos = self._calculateNextStep(
                     current_position=state[0:3],
                     destination=target,
@@ -327,6 +331,18 @@ class BaseRLAviary(BaseAviary):
                 elif self.ACT_TYPE in [ActionType.ONE_D_RPM, ActionType.ONE_D_PID]:
                     obs_lower_bound = np.hstack([obs_lower_bound, np.array([[act_lo] for i in range(self.NUM_DRONES)])])
                     obs_upper_bound = np.hstack([obs_upper_bound, np.array([[act_hi] for i in range(self.NUM_DRONES)])])
+
+            # Add space for incentives
+            extra_obs_size = 0
+            if self.incentive_options.get("nearest_unexplored_voxel", False):
+                extra_obs_size += 4  # vec (3) + distance
+            if self.incentive_options.get("exploration_percentage", False):
+                extra_obs_size += 1
+
+            if extra_obs_size > 0:
+                obs_lower_bound = np.hstack([obs_lower_bound, np.array([[act_lo]*extra_obs_size for _ in range(self.NUM_DRONES)])])
+                obs_upper_bound = np.hstack([obs_upper_bound, np.array([[act_hi]*extra_obs_size for _ in range(self.NUM_DRONES)])])
+
             return spaces.Box(low=obs_lower_bound, high=obs_upper_bound, dtype=np.float32)
             ############################################################
         else:
@@ -370,7 +386,30 @@ class BaseRLAviary(BaseAviary):
             #### Add action buffer to observation #######################
             for i in range(self.ACTION_BUFFER_SIZE):
                 ret = np.hstack([ret, np.array([self.action_buffer[i][j, :] for j in range(self.NUM_DRONES)])])
+
+            #### Add incentives ########################################
+            # Determine total extra size based on enabled incentives
+            extra_size = 0
+            if self.incentive_options.get("nearest_unexplored_voxel", False):
+                extra_size += 4  # vector3 + distance
+            if self.incentive_options.get("exploration_percentage", False):
+                extra_size += 1
+
+            if extra_size > 0:
+                extra_obs_arr = np.zeros((self.NUM_DRONES, extra_size), dtype=np.float32)
+                for i in range(self.NUM_DRONES):
+                    offset = 0
+                    if self.incentive_options.get("nearest_unexplored_voxel", False):
+                        dist, vec = self._nearest_unexplored_voxel()  # shape (1,3), scalar
+                        extra_obs_arr[i, offset:offset + 3] = vec
+                        extra_obs_arr[i, offset + 3] = dist
+                        offset += 4
+                    if self.incentive_options.get("exploration_percentage", False):
+                        extra_obs_arr[i, offset] = self._exploration_percentage()
+                ret = np.hstack([ret, extra_obs_arr])
+
             return ret
-            ############################################################
+
         else:
             print("[ERROR] in BaseRLAviary._computeObs()")
+            return None
