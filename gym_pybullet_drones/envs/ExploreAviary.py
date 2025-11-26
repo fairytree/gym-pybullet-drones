@@ -1,4 +1,5 @@
 import numpy as np
+import ParticleFilter as pf
 
 from gym_pybullet_drones.envs.BaseRLAviary import BaseRLAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType
@@ -72,6 +73,7 @@ class ExploreAviary(BaseRLAviary):
             for obs in self.obstacles_info
         ]
         self.last_waypoint = np.array([0.0, 0.0, 0.0]) 
+        self.filter=pf()
 
     ################################################################################
     
