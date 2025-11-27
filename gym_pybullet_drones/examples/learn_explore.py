@@ -51,8 +51,8 @@ DEFAULT_INCENTIVE_OPTIONS = {
     "change_direction_penalty": True, # Penalty for changing direction abruptly
     "collision_penalty": True, # Penalty for colliding with obstacles
     "time_penalty": True, # Penalty for time taken to encourage faster exploration
-    # "exploration_percentage": True, # provide additional observation of percentage explored
-    # "nearest_unexplored_voxel": True # provide additional observation of position of nearest unexplored voxel
+    "exploration_percentage": True, # provide additional observation of percentage explored
+    "nearest_unexplored_voxel": True # provide additional observation of position of nearest unexplored voxel
 }
 
 def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=DEFAULT_COLAB, record_video=DEFAULT_RECORD_VIDEO, local=True, incentive_options=DEFAULT_INCENTIVE_OPTIONS):
@@ -117,7 +117,7 @@ def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_F
     callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=target_reward,
                                                      verbose=1)
     eval_callback = EvalCallback(eval_env,
-                                 callback_on_new_best=callback_on_best,
+                                #  callback_on_new_best=callback_on_best,
                                  verbose=1,
                                  best_model_save_path=filename+'/',
                                  log_path=filename+'/',

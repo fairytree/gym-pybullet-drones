@@ -25,8 +25,8 @@ DEFAULT_INCENTIVE_OPTIONS = {
     "change_direction_penalty": True, # Penalty for changing direction abruptly
     "collision_penalty": True, # Penalty for colliding with obstacles
     "time_penalty": True, # Penalty for time taken to encourage faster exploration
-    # "exploration_percentage": True, # provide additional observation of percentage explored
-    # "nearest_unexplored_voxel": True # provide additional observation of position of nearest unexplored voxel
+    "exploration_percentage": True, # provide additional observation of percentage explored
+    "nearest_unexplored_voxel": True # provide additional observation of position of nearest unexplored voxel
 }
 
 def play(model_path=DEFAULT_MODEL_PATH, algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, gui=DEFAULT_GUI,incentive_options=DEFAULT_INCENTIVE_OPTIONS):
