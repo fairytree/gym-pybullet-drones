@@ -395,13 +395,15 @@ class BaseRLAviary(BaseAviary):
             #### Add action buffer to observation #######################
             for i in range(self.ACTION_BUFFER_SIZE):
                 ret = np.hstack([ret, np.array([self.action_buffer[i][j, :] for j in range(self.NUM_DRONES)])])
+            
+            ### Add best location guesses to observation
             curr_best = self.filter.get_top_k_modes()
             if curr_best.shape[0] != 3:
                 delta=3-curr_best.shape[0]
                 repeats = np.repeat(curr_best[0:1],delta,axis=0)
                 curr_best=np.vstack([curr_best,repeats])
             
-
+            
             for i in range(3):
                 ret = np.hstack([ret, np.array([curr_best[i] for j in range(self.NUM_DRONES)])])
             return ret

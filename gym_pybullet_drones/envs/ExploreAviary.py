@@ -55,9 +55,11 @@ class ExploreAviary(BaseRLAviary):
         self.grid_size = 0.2  # discretization step in meters
 
         self.EPISODE_LEN_SEC = 40
+
+        #setting up distances
+        self.closest_distance = np.inf
+        self.last_distance = np.inf
         
-        
-        #set up filter
         
         super().__init__(drone_model=drone_model,
                          num_drones=1,
@@ -95,7 +97,7 @@ class ExploreAviary(BaseRLAviary):
         state = self._getDroneStateVector(0)
         pos = tuple(np.round(state[0:3] / self.grid_size).astype(int))
         reward = 0.0
-        alpha = 0.5
+        alpha = 0.1
         did_sense=self.action_buffer[-1][0,-1] > 0
         
         #penalty for existing
@@ -109,12 +111,15 @@ class ExploreAviary(BaseRLAviary):
         # reward for reducing KL divergence (and not being at the target)
         if did_sense and distance_to_target >= 0.2:
             #penalty for sensing
-            reward += -0.4
+            reward += -0.5
             distance_with_error=distance_to_target + np.random.normal(loc=0,scale=self.measurement_sd)
             KL_reward=self.filter.KL_divergence(state[0:3],distance_with_error)
             reward += alpha*KL_reward
             self.filter.predict()
-            
+        
+        # penalty to stop the drone flying above the walls
+        if state[2]>0.5:
+            reward -= state[2]
 
         # Penalty for leaving bounds
         if np.any(state[0:3] < self.bounds[:,0]) or np.any(state[0:3] > self.bounds[:,1]):
