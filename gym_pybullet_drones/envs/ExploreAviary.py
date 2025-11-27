@@ -1,5 +1,7 @@
 import numpy as np
-import ParticleFilter as pf
+
+from gym_pybullet_drones.envs.ParticleFilter import ParticleFilter as pf
+
 
 from gym_pybullet_drones.envs.BaseRLAviary import BaseRLAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType
@@ -54,6 +56,9 @@ class ExploreAviary(BaseRLAviary):
 
         self.EPISODE_LEN_SEC = 40
         
+        
+        #set up filter
+        
         super().__init__(drone_model=drone_model,
                          num_drones=1,
                          initial_xyzs=initial_xyzs,
@@ -66,14 +71,15 @@ class ExploreAviary(BaseRLAviary):
                          obs=obs,
                          act=act
                          )
+        
 
         # Each obstacle: (center_position, half_extents)
         self.obstacles = [
             (np.array(obs["position"]), np.array(obs["size"]) / 2)
             for obs in self.obstacles_info
         ]
-        self.last_waypoint = np.array([0.0, 0.0, 0.0]) 
-        self.filter=pf()
+        self.last_waypoint = np.array([0.0, 0.0, 0.0])
+        
 
     ################################################################################
     
@@ -89,21 +95,26 @@ class ExploreAviary(BaseRLAviary):
         state = self._getDroneStateVector(0)
         pos = tuple(np.round(state[0:3] / self.grid_size).astype(int))
         reward = 0.0
+        alpha = 0.5
+        did_sense=self.action_buffer[-1][0,-1] > 0
         
         #penalty for existing
         reward += -0.01
-
-        # reward for visiting new cells
-        if pos not in self.visited:
-            reward += 10.0
-            self.visited.add(pos)
-        else:
-            reward -= 0.1  # penalty for revisiting, try smaller penalty if too harsh
 
         # add reward for reaching the target (Need to add distance_to_target info as state)
         distance_to_target = np.linalg.norm(state[0:3] - self.emmit_target)
         if distance_to_target < 0.2:
             reward += 1000.0
+        
+        # reward for reducing KL divergence (and not being at the target)
+        if did_sense and distance_to_target >= 0.2:
+            #penalty for sensing
+            reward += -0.4
+            distance_with_error=distance_to_target + np.random.normal(loc=0,scale=self.measurement_sd)
+            KL_reward=self.filter.KL_divergence(state[0:3],distance_with_error)
+            reward += alpha*KL_reward
+            self.filter.predict()
+            
 
         # Penalty for leaving bounds
         if np.any(state[0:3] < self.bounds[:,0]) or np.any(state[0:3] > self.bounds[:,1]):

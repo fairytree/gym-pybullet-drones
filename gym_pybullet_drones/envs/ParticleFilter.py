@@ -13,19 +13,20 @@ class ParticleFilter:
         self.sigma=float(sigma)
         self.std_dev=float(std_dev)
 
-        #ensure there are bounds given, then make into (3,2) for x,y,z upper/lower
+        #ensure there are bounds given, then make into (3,2) for x,y,z lower/upper
         if bounds is None:
             raise ValueError("In Particle Filter: missing bounds")
         else:
             self.bounds=np.asarray(bounds, dtype=float).reshape(3,2)
         self.particles = self._uniform_sample(self.N)
-        self.weights=np.ones(self.N).self.N
+        self.weights=np.ones(self.N)
     
     ##Creates a uniform sample accross the bounds
     def _uniform_sample(self, N):
         low=self.bounds[:,0]
         high=self.bounds[:,1]
         samples=self.rng.uniform(low=low, high=high, size=(N,3))
+        return samples
 
     def predict(self):
         #confirm there is a deviation, if so add noise
@@ -39,7 +40,7 @@ class ParticleFilter:
         sensor_read: new reading from sensor
         """
         # predict range of each particle
-        delta=self.particles=sensor_pos.reshape((1,3))
+        delta=self.particles-sensor_pos.reshape((1,3))
         ranges = np.linalg.norm(delta, axis=1)
 
         residual=(sensor_read-ranges)/self.sigma
@@ -87,7 +88,7 @@ class ParticleFilter:
         """
 
         N=self.N
-        positions=(self.rng.random()+np.arrange(N))/N
+        positions=(self.rng.random()+np.arange(N))/N
         cum_weights=np.cumsum(self.weights)
         new_particles=np.empty_like(self.particles)
         i,j=0,0
@@ -132,7 +133,7 @@ class ParticleFilter:
         idx = np.argsort(self.weights)[::-1]
         modes = []
         for i in idx:
-            p=self.particles[i]
+            p=self.particles[i].copy()
             if all(np.linalg.norm(p-m)>=min_seperation for m in modes):
                 modes.append(p.copy())
                 if len(modes)>=k:

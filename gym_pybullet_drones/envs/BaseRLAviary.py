@@ -5,6 +5,7 @@ from gymnasium import spaces
 from collections import deque
 import time
 
+from gym_pybullet_drones.envs.ParticleFilter import ParticleFilter as pf
 from gym_pybullet_drones.envs.BaseAviary import BaseAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType, ImageType
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
@@ -83,6 +84,11 @@ class BaseRLAviary(BaseAviary):
                                 [-2, 2],        # Y min/max
                                 [0.0, 2.0]])    # Z min/max
         self.current_waypoint = np.array([0.0, 0.0, 0.0])
+        #standard deviation of noise in measurement
+        self.measurement_sd = 0.2
+        bounds = self.bounds
+        self.filter=pf(N=1000,bounds=bounds)
+        
         super().__init__(drone_model=drone_model,
                          num_drones=num_drones,
                          neighbourhood_radius=neighbourhood_radius,
@@ -342,6 +348,10 @@ class BaseRLAviary(BaseAviary):
                 elif self.ACT_TYPE in [ActionType.ONE_D_RPM, ActionType.ONE_D_PID]:
                     obs_lower_bound = np.hstack([obs_lower_bound, np.array([[act_lo] for i in range(self.NUM_DRONES)])])
                     obs_upper_bound = np.hstack([obs_upper_bound, np.array([[act_hi] for i in range(self.NUM_DRONES)])])
+            # Add 3 current best predictions for location of target, each with x,y,z
+            for j in range(3):
+                obs_lower_bound = np.hstack([obs_lower_bound, np.array([[act_lo,act_lo,act_lo] for i in range(self.NUM_DRONES)])])
+                obs_upper_bound = np.hstack([obs_upper_bound, np.array([[act_hi,act_hi,act_hi] for i in range(self.NUM_DRONES)])])
             return spaces.Box(low=obs_lower_bound, high=obs_upper_bound, dtype=np.float32)
             ############################################################
         else:
@@ -385,6 +395,15 @@ class BaseRLAviary(BaseAviary):
             #### Add action buffer to observation #######################
             for i in range(self.ACTION_BUFFER_SIZE):
                 ret = np.hstack([ret, np.array([self.action_buffer[i][j, :] for j in range(self.NUM_DRONES)])])
+            curr_best = self.filter.get_top_k_modes()
+            if curr_best.shape[0] != 3:
+                delta=3-curr_best.shape[0]
+                repeats = np.repeat(curr_best[0:1],delta,axis=0)
+                curr_best=np.vstack([curr_best,repeats])
+            
+
+            for i in range(3):
+                ret = np.hstack([ret, np.array([curr_best[i] for j in range(self.NUM_DRONES)])])
             return ret
             ############################################################
         else:
