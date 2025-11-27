@@ -26,7 +26,6 @@ from stable_baselines3 import PPO, TD3
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.monitor import Monitor
 
 from gym_pybullet_drones.utils.Logger import Logger
 from gym_pybullet_drones.envs.ExploreAviary import ExploreAviary
@@ -157,18 +156,18 @@ def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_F
 
     #### Show (and record a video of) the model's performance ##
     if not multiagent:
-        test_env = Monitor(ExploreAviary(gui=gui,
+        test_env = ExploreAviary(gui=gui,
                                obs=DEFAULT_OBS,
                                act=DEFAULT_ACT,
-                               record=record_video,incentive_options=incentive_options))
-        test_env_nogui = Monitor(ExploreAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT,incentive_options=incentive_options))
+                               record=record_video,incentive_options=incentive_options)
+        test_env_nogui = ExploreAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT,incentive_options=incentive_options)
     else:
-        test_env = Monitor(MultiHoverAviary(gui=gui,
+        test_env = MultiHoverAviary(gui=gui,
                                         num_drones=DEFAULT_AGENTS,
                                         obs=DEFAULT_OBS,
                                         act=DEFAULT_ACT,
-                                        record=record_video))
-        test_env_nogui = Monitor(MultiHoverAviary(num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT))
+                                        record=record_video)
+        test_env_nogui = MultiHoverAviary(num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT)
     logger = Logger(logging_freq_hz=int(test_env.CTRL_FREQ),
                 num_drones=DEFAULT_AGENTS if multiagent else 1,
                 output_folder=output_folder,

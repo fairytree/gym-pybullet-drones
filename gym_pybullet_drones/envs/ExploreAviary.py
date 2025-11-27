@@ -321,5 +321,5 @@ class ExploreAviary(BaseRLAviary):
         i = idx1d // (self.ny * self.nz)
         j = (idx1d % (self.ny * self.nz)) // self.nz
         k = idx1d % self.nz
-        pos = np.array([i, j, k]) * self.grid_size + np.array([self.grid_size/2]*3) + self.bounds[:,0]
+        pos = np.array([i, j, k]) * self.grid_size + self.bounds[:,0]
         return pos
