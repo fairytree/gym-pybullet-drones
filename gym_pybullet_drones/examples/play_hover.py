@@ -13,11 +13,29 @@ from gym_pybullet_drones.utils.Logger import Logger
 DEFAULT_MODEL_PATH = "results/best_model.zip"
 DEFAULT_GUI = True
 DEFAULT_OBS = ObservationType('kin')
-DEFAULT_ACT = ActionType('one_d_rpm')
+DEFAULT_ACT = ActionType('rpm')
 DEFAULT_AGENTS = 2
 DEFAULT_MA = False
+DEFAULT_INCENTIVE_OPTIONS = {
+    # ---------- Reward Function ----------
+    # "new_voxel_reward": True, # Reward for exploring a new voxel
+    # "out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
+    # "change_direction_penalty": True, # Penalty for changing direction abruptly
+    # "collision_penalty": True, # Penalty for colliding with obstacles
+    # "time_penalty": True, # Penalty for time taken to encourage faster exploration
 
-def play(model_path=DEFAULT_MODEL_PATH, multiagent=DEFAULT_MA, gui=DEFAULT_GUI):
+    # ---------- Search Task ----------
+    # "search": True, # Reward for getting closer to target
+
+    # ---------- Environment Options ----------
+    # "construct_obstacles": True # construct obstacles in the environment
+
+    # ---------- Observation (State) Options ----------
+    # "exploration_percentage": True, # provide additional observation of percentage explored
+    # "nearest_unexplored_voxel": True, # provide additional observation of position of nearest unexplored voxel
+}
+
+def play(model_path=DEFAULT_MODEL_PATH, multiagent=DEFAULT_MA, gui=DEFAULT_GUI,incentive_options=DEFAULT_INCENTIVE_OPTIONS):
     #### Load saved model ####
     if not os.path.isfile(model_path):
         print(f"[ERROR] Model file not found at: {model_path}")
@@ -28,7 +46,7 @@ def play(model_path=DEFAULT_MODEL_PATH, multiagent=DEFAULT_MA, gui=DEFAULT_GUI):
 
     #### Create test environment ####
     if not multiagent:
-        env = HoverAviary(gui=gui, obs=DEFAULT_OBS, act=DEFAULT_ACT)
+        env = HoverAviary(gui=gui, obs=DEFAULT_OBS, act=DEFAULT_ACT, incentive_options=incentive_options)
     else:
         env = MultiHoverAviary(gui=gui, num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT)
 

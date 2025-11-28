@@ -18,7 +18,8 @@ class HoverAviary(BaseRLAviary):
                  gui=False,
                  record=False,
                  obs: ObservationType=ObservationType.KIN,
-                 act: ActionType=ActionType.RPM
+                 act: ActionType=ActionType.RPM,
+                 incentive_options: dict=None
                  ):
         """Initialization of a single agent RL environment.
 
@@ -48,8 +49,9 @@ class HoverAviary(BaseRLAviary):
             The type of action space (1 or 3D; RPMS, thurst and torques, or waypoint with PID control)
 
         """
-        self.TARGET_POS = np.array([0,0,1])
+        self.TARGET_POS = np.array([-1,-1,0.2])
         self.EPISODE_LEN_SEC = 8
+        self.incentive_options = incentive_options
         super().__init__(drone_model=drone_model,
                          num_drones=1,
                          initial_xyzs=initial_xyzs,
@@ -60,7 +62,8 @@ class HoverAviary(BaseRLAviary):
                          gui=gui,
                          record=record,
                          obs=obs,
-                         act=act
+                         act=act,
+                         incentive_options=incentive_options
                          )
 
     ################################################################################

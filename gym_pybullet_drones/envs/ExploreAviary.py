@@ -106,31 +106,39 @@ class ExploreAviary(BaseRLAviary):
         reward = 0.0
 
         # reward for visiting new voxel
-        if self.incentive_options.get("new_voxel_reward", True):
-            if not self.visited_mask[idx1d] and not out_of_bounds:
+        if not self.visited_mask[idx1d] and not out_of_bounds:
+            self.visited_mask[idx1d] = True
+            self.visited.add(idx3d) # for visualization
+            if self.incentive_options.get("new_voxel_reward", False):
                 reward += 10.0
-                self.visited_mask[idx1d] = True
-                self.visited.add(idx3d)
-            else:
+        else:
+            if self.incentive_options.get("new_voxel_reward", False):
                 reward -= 0.1  # penalty for revisiting, try smaller penalty if too harsh
 
         # Penalty for leaving bounds
-        if self.incentive_options.get("out_of_boundary_penalty", True):
+        if self.incentive_options.get("out_of_boundary_penalty", False):
             if np.any(current_pos < self.bounds[:,0]) or np.any(current_pos > self.bounds[:,1]):
                 reward -= 0.1
 
         # direction-change penalty
-        if self.incentive_options.get("change_direction_penalty", True):
+        if self.incentive_options.get("change_direction_penalty", False):
             reward += self._direction_penalty(current_pos, self.last_waypoint, self.current_waypoint)
             self.last_waypoint = self.current_waypoint.copy()
 
         # Penalty for collisions with obstacles (boxes)
-        if self.incentive_options.get("collision_penalty", True) and self._checkCollision(state[0:3]):
+        if self.incentive_options.get("collision_penalty", False) and self._checkCollision(state[0:3]):
             reward -= 100
 
         # time penalty
-        if self.incentive_options.get("time_penalty", True):
-            reward -= 0.0001
+        if self.incentive_options.get("time_penalty", False):
+            reward -= 0.1
+
+
+        if self.incentive_options.get("search", False):
+            dist = np.linalg.norm(self.target - current_pos)**2
+            reward += max(0, 2 - dist)
+            if dist < 0.1:
+                reward += 500
 
         return reward
 

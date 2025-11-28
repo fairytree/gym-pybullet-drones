@@ -46,13 +46,22 @@ DEFAULT_MA = False
 DEFAULT_ALGO = "PPO" # "PPO" or "TD3" RL algorithm
 DEFAULT_ACT = ActionType('pid') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
 DEFAULT_INCENTIVE_OPTIONS = {
-    "new_voxel_reward": True, # Reward for exploring a new voxel
-    "out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
-    "change_direction_penalty": True, # Penalty for changing direction abruptly
-    "collision_penalty": True, # Penalty for colliding with obstacles
+    # ---------- Reward Function ----------
+    # "new_voxel_reward": True, # Reward for exploring a new voxel
+    # "out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
+    # "change_direction_penalty": True, # Penalty for changing direction abruptly
+    # "collision_penalty": True, # Penalty for colliding with obstacles
     "time_penalty": True, # Penalty for time taken to encourage faster exploration
-    "exploration_percentage": True, # provide additional observation of percentage explored
-    "nearest_unexplored_voxel": True # provide additional observation of position of nearest unexplored voxel
+
+    # ---------- Search Task ----------
+    "search": True, # Reward for getting closer to target
+
+    # ---------- Environment Options ----------
+    # "construct_obstacles": True # construct obstacles in the environment
+
+    # ---------- Observation (State) Options ----------
+    # "exploration_percentage": True, # provide additional observation of percentage explored
+    # "nearest_unexplored_voxel": True, # provide additional observation of position of nearest unexplored voxel
 }
 
 def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=DEFAULT_COLAB, record_video=DEFAULT_RECORD_VIDEO, local=True, incentive_options=DEFAULT_INCENTIVE_OPTIONS):

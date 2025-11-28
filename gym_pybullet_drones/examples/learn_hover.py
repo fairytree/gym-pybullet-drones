@@ -39,11 +39,29 @@ DEFAULT_OUTPUT_FOLDER = 'results'
 DEFAULT_COLAB = False
 
 DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
-DEFAULT_ACT = ActionType('one_d_rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
+DEFAULT_ACT = ActionType('rpm') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
 DEFAULT_AGENTS = 2
 DEFAULT_MA = False
+DEFAULT_INCENTIVE_OPTIONS = {
+    # ---------- Reward Function ----------
+    # "new_voxel_reward": True, # Reward for exploring a new voxel
+    # "out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
+    # "change_direction_penalty": True, # Penalty for changing direction abruptly
+    # "collision_penalty": True, # Penalty for colliding with obstacles
+    # "time_penalty": True, # Penalty for time taken to encourage faster exploration
 
-def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=DEFAULT_COLAB, record_video=DEFAULT_RECORD_VIDEO, local=True):
+    # ---------- Search Task ----------
+    # "search": True, # Reward for getting closer to target
+
+    # ---------- Environment Options ----------
+    # "construct_obstacles": True # construct obstacles in the environment
+
+    # ---------- Observation (State) Options ----------
+    # "exploration_percentage": True, # provide additional observation of percentage explored
+    # "nearest_unexplored_voxel": True, # provide additional observation of position of nearest unexplored voxel
+}
+
+def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=DEFAULT_COLAB, record_video=DEFAULT_RECORD_VIDEO, local=True, incentive_options=DEFAULT_INCENTIVE_OPTIONS):
 
     filename = os.path.join(output_folder, 'save-'+datetime.now().strftime("%m.%d.%Y_%H.%M.%S"))
     if not os.path.exists(filename):
@@ -51,11 +69,11 @@ def run(multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_
 
     if not multiagent:
         train_env = make_vec_env(HoverAviary,
-                                 env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT),
+                                 env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT,incentive_options=incentive_options),
                                  n_envs=1,
                                  seed=0
                                  )
-        eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT)
+        eval_env = HoverAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT,incentive_options=incentive_options)
     else:
         train_env = make_vec_env(MultiHoverAviary,
                                  env_kwargs=dict(num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT),

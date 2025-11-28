@@ -118,17 +118,19 @@ class BaseRLAviary(BaseAviary):
             {"position": [-1.5, -1.0, 0.125], "size": [0.25, 0.5, 0.25], "color": [0.5, 0.5, 1.0, 1.0]}
         ]
 
-        for wall in walls:
-            self.create_wall(position=wall["position"], size=wall["size"], color=wall["color"])
-            self.obstacles_info.append({"position": wall["position"], "size": wall["size"]})
+        if self.incentive_options.get("construct_obstacles", False):
+            for wall in walls:
+                self.create_wall(position=wall["position"], size=wall["size"], color=wall["color"])
+                self.obstacles_info.append({"position": wall["position"], "size": wall["size"]})
 
         self.target = np.array([-1.8, -1.0, .1])
-        p.loadURDF("duck_vhacd.urdf",
+        duck_id = p.loadURDF("duck_vhacd.urdf",
             self.target,
             p.getQuaternionFromEuler([0, 0, 0]),
             globalScaling=2.0,
             physicsClientId=self.CLIENT
             )
+        p.setCollisionFilterGroupMask(duck_id, -1, 1, 0) # make the duck not collidable
 
     def create_wall(self, position, size, color=[1, 1, 1, 1], mass=0):
         """Create a box-shaped wall in the environment."""
