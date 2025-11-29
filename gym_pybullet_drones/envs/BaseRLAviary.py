@@ -111,6 +111,18 @@ class BaseRLAviary(BaseAviary):
         Overrides BaseAviary's method.
 
         """
+        #clean up pybullet, removing everything except drone and plane
+        DP_ids = set(self.DRONE_IDS)|{self.PLANE_ID}
+
+        all_id = [p.getBodyUniqueId(i) for i in range(p.getNumBodies())]
+        
+        for id in all_id:
+            if id not in DP_ids:
+                p.removeBody(id)
+        
+        #clear obstacle_info
+        self.obstacles_info = [{"position": [0,0,100], "size": [0.1,0.1,0.1]}]
+
         walls = [
             {"position": [1.0, 0.0, 0.25], "size": [0.5, 0.1, 0.5], "color": [0.8, 0.8, 0.8, 1.0]},
             {"position": [-0.5, 0.5, 0.25], "size": [0.1, 2.0, 0.5], "color": [1.0, 0.5, 0.5, 1.0]},
@@ -123,7 +135,9 @@ class BaseRLAviary(BaseAviary):
                 self.create_wall(position=wall["position"], size=wall["size"], color=wall["color"])
                 self.obstacles_info.append({"position": wall["position"], "size": wall["size"]})
 
-        self.target = np.array([-1.8, -1.0, .1])
+        
+        
+        self.target = np.array([np.random.uniform(low=-1.0, high=1.0), np.random.uniform(low=-1.0, high=1.0), .1])
         duck_id = p.loadURDF("duck_vhacd.urdf",
             self.target,
             p.getQuaternionFromEuler([0, 0, 0]),
@@ -340,7 +354,8 @@ class BaseRLAviary(BaseAviary):
                 extra_obs_size += 4  # vec (3) + distance
             if self.incentive_options.get("exploration_percentage", False):
                 extra_obs_size += 1
-            #if self.incentive_options.get(,False)
+            if self.incentive_options.get("search",False):
+                extra_obs_size+=1
 
             if extra_obs_size > 0:
                 obs_lower_bound = np.hstack([obs_lower_bound, np.array([[act_lo]*extra_obs_size for _ in range(self.NUM_DRONES)])])
@@ -397,6 +412,8 @@ class BaseRLAviary(BaseAviary):
                 extra_size += 4  # vector3 + distance
             if self.incentive_options.get("exploration_percentage", False):
                 extra_size += 1
+            if self.incentive_options.get("search", False):
+                extra_size += 1
 
             if extra_size > 0:
                 extra_obs_arr = np.zeros((self.NUM_DRONES, extra_size), dtype=np.float32)
@@ -409,6 +426,10 @@ class BaseRLAviary(BaseAviary):
                         offset += 4
                     if self.incentive_options.get("exploration_percentage", False):
                         extra_obs_arr[i, offset] = self._exploration_percentage()
+                        offset += 1
+                    if self.incentive_options.get("search", False):
+                        extra_obs_arr[i, offset] = np.linalg.norm(self.pos-self.target)
+                        offset += 1
                 ret = np.hstack([ret, extra_obs_arr])
 
             return ret
