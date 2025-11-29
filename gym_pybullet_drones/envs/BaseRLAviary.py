@@ -340,6 +340,7 @@ class BaseRLAviary(BaseAviary):
                 extra_obs_size += 4  # vec (3) + distance
             if self.incentive_options.get("exploration_percentage", False):
                 extra_obs_size += 1
+            #if self.incentive_options.get(,False)
 
             if extra_obs_size > 0:
                 obs_lower_bound = np.hstack([obs_lower_bound, np.array([[act_lo]*extra_obs_size for _ in range(self.NUM_DRONES)])])

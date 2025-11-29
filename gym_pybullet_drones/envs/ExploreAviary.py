@@ -53,7 +53,6 @@ class ExploreAviary(BaseRLAviary):
         self.grid_size = 0.2  # discretization step in meters
         self.EPISODE_LEN_SEC = 120
         self.incentive_options = incentive_options
-
         super().__init__(drone_model=drone_model,
                          num_drones=1,
                          initial_xyzs=initial_xyzs,
@@ -85,8 +84,12 @@ class ExploreAviary(BaseRLAviary):
         self.visited_mask = np.zeros(self.total_voxels, dtype=bool)  
         self.drawn_mask = np.zeros_like(self.visited_mask)
         self.visited = set()
+        self.best_dist=np.linalg.norm(self.target - np.zeros((self.NUM_DRONES, 3)))**2
 
-        
+
+    def reset(self, seed = None, options = None):
+        self.best_dist=np.linalg.norm(self.target - np.zeros((self.NUM_DRONES, 3)))**2
+        return super().reset(seed, options)    
     ################################################################################
     
     def _computeReward(self):
@@ -136,9 +139,11 @@ class ExploreAviary(BaseRLAviary):
 
         if self.incentive_options.get("search", False):
             dist = np.linalg.norm(self.target - current_pos)**2
-            reward += max(0, 2 - dist)
-            if dist < 0.1:
-                reward += 500
+            if dist < self.best_dist:
+                reward += 100*(self.best_dist-dist)
+                self.best_dist=dist
+            if dist < 0.2:
+                reward += 5000
 
         return reward
 
@@ -172,7 +177,11 @@ class ExploreAviary(BaseRLAviary):
             Whether the current episode is done.
 
         """
-        return False  # exploration continues until truncated
+        trunc = False
+        if self.incentive_options.get("search", False):
+            if self.best_dist < 0.2:
+                trunc = trunc or True
+        return trunc  # exploration continues until truncated
 
         
     ################################################################################
