@@ -26,6 +26,7 @@ from stable_baselines3 import PPO, TD3
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.callbacks import BaseCallback
 
 from gym_pybullet_drones.utils.Logger import Logger
 from gym_pybullet_drones.envs.ExploreAviary import ExploreAviary
@@ -43,12 +44,14 @@ DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
 DEFAULT_AGENTS = 2
 DEFAULT_MA = False
 
-DEFAULT_ALGO = "PPO" # "PPO" or "TD3" RL algorithm
+DEFAULT_ENVS = 1
+
+DEFAULT_ALGO = "TD3" # "PPO" or "TD3" RL algorithm
 DEFAULT_ACT = ActionType('pid') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
 DEFAULT_INCENTIVE_OPTIONS = {
     # ---------- Reward Function ----------
     # "new_voxel_reward": True, # Reward for exploring a new voxel
-    # "out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
+    "out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
     # "change_direction_penalty": True, # Penalty for changing direction abruptly
     # "collision_penalty": True, # Penalty for colliding with obstacles
     "time_penalty": True, # Penalty for time taken to encourage faster exploration
@@ -73,7 +76,7 @@ def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_F
     if not multiagent:
         train_env = make_vec_env(ExploreAviary,
                                  env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT,incentive_options=incentive_options),
-                                 n_envs=1,
+                                 n_envs=DEFAULT_ENVS,
                                  seed=0
                                  )
         eval_env = ExploreAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, incentive_options=incentive_options)
@@ -100,7 +103,9 @@ def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_F
             train_env,
             ent_coef=0.05,
             verbose=1,
-            policy_kwargs=dict(net_arch=[256,256,128])
+            policy_kwargs=dict(net_arch=[256,256,128]),
+            learning_rate=3e-4
+
         )
     elif algo == "TD3":
         model = TD3(
@@ -109,14 +114,19 @@ def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_F
             verbose=1,
             policy_kwargs=dict(net_arch=[256,256,128]),
             action_noise=action_noise,
-            buffer_size=100000,
-            learning_starts=1000,
+            buffer_size=int(5e5),
+            learning_starts=5000,
             batch_size=256,
             tau=0.005,
-            gamma=0.99
+            gamma=0.98,
+            learning_rate=3e-4,
+            train_freq=(1,"step")
         )
     else:
         raise ValueError(f"[ERROR] Unsupported algorithm: {algo}. Choose 'PPO' or 'TD3'.")
+
+    stop_callback = ExternalStopCallback(stop_file="stop_training")
+
 
     #### Target cumulative rewards (problem-dependent) ##########
     if DEFAULT_ACT == ActionType.ONE_D_RPM:
@@ -133,9 +143,10 @@ def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_F
                                  eval_freq=int(1000),
                                  deterministic=True,
                                  render=False)
-    model.learn(total_timesteps=int(5*1e5) if local else int(1e2), # shorter training in GitHub Actions pytest
-                callback=eval_callback,
-                log_interval=100)
+    model.learn(total_timesteps=int(1e8) if local else int(1e2), # shorter training in GitHub Actions pytest
+                callback=[eval_callback,stop_callback],
+                log_interval=100,
+                progress_bar=True)
 
     #### Save the model ########################################
     model.save(filename+'/final_model.zip')
@@ -230,6 +241,20 @@ def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_F
 
     if plot and DEFAULT_OBS == ObservationType.KIN:
         logger.plot()
+
+class ExternalStopCallback(BaseCallback):
+    def __init__(self, stop_file="STOP", verbose=1):
+        super().__init__(verbose)
+        self.stop_file = stop_file
+
+    def _on_step(self) -> bool:
+        if os.path.exists(self.stop_file):
+            print("\n*** EARLY STOP REQUESTED — STOP FILE DETECTED ***\n")
+            return False
+        return True
+
+
+
 
 if __name__ == '__main__':
     #### Define and parse (optional) arguments for the script ##

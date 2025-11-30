@@ -84,11 +84,11 @@ class ExploreAviary(BaseRLAviary):
         self.visited_mask = np.zeros(self.total_voxels, dtype=bool)  
         self.drawn_mask = np.zeros_like(self.visited_mask)
         self.visited = set()
-        self.best_dist=np.linalg.norm(self.target - np.zeros((self.NUM_DRONES, 3)))**2
+        self.last_dist=np.linalg.norm(self.target - np.zeros((self.NUM_DRONES, 3)))**2
 
 
     def reset(self, seed = None, options = None):
-        self.best_dist=np.linalg.norm(self.target - np.zeros((self.NUM_DRONES, 3)))**2
+        self.last_dist=np.linalg.norm(self.target - np.zeros((self.NUM_DRONES, 3)))**2
         return super().reset(seed, options)    
     ################################################################################
     
@@ -109,13 +109,12 @@ class ExploreAviary(BaseRLAviary):
         reward = 0.0
 
         # reward for visiting new voxel
-        if not self.visited_mask[idx1d] and not out_of_bounds:
-            self.visited_mask[idx1d] = True
-            self.visited.add(idx3d) # for visualization
-            if self.incentive_options.get("new_voxel_reward", False):
+        if self.incentive_options.get("new_voxel_reward", False):
+            if not self.visited_mask[idx1d] and not out_of_bounds:
+                self.visited_mask[idx1d] = True
+                self.visited.add(idx3d) # for visualization
                 reward += 10.0
-        else:
-            if self.incentive_options.get("new_voxel_reward", False):
+            else:
                 reward -= 0.1  # penalty for revisiting, try smaller penalty if too harsh
 
         # Penalty for leaving bounds
@@ -138,10 +137,9 @@ class ExploreAviary(BaseRLAviary):
 
 
         if self.incentive_options.get("search", False):
-            dist = np.linalg.norm(self.target - current_pos)**2
-            if dist < self.best_dist:
-                reward += 100*(self.best_dist-dist)
-                self.best_dist=dist
+            dist = np.linalg.norm(self.target - current_pos)
+            reward += (self.last_dist-dist)
+            self.last_dist=dist
             if dist < 0.2:
                 reward += 5000
 
@@ -179,7 +177,7 @@ class ExploreAviary(BaseRLAviary):
         """
         trunc = False
         if self.incentive_options.get("search", False):
-            if self.best_dist < 0.2:
+            if self.last_dist < 0.2:
                 trunc = trunc or True
         return trunc  # exploration continues until truncated
 

@@ -17,12 +17,12 @@ DEFAULT_OBS = ObservationType('kin')
 DEFAULT_AGENTS = 2
 DEFAULT_MA = False
 
-DEFAULT_ALGO = "PPO"  # "PPO" or "TD3" RL algorithm
+DEFAULT_ALGO = "TD3"  # "PPO" or "TD3" RL algorithm
 DEFAULT_ACT = ActionType('pid')  # 'rpm' for RL to output rpm directly or 'pid' for RL to output waypoints tracked by PID
 DEFAULT_INCENTIVE_OPTIONS = {
     # ---------- Reward Function ----------
     # "new_voxel_reward": True, # Reward for exploring a new voxel
-    # "out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
+    "out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
     # "change_direction_penalty": True, # Penalty for changing direction abruptly
     # "collision_penalty": True, # Penalty for colliding with obstacles
     "time_penalty": True, # Penalty for time taken to encourage faster exploration

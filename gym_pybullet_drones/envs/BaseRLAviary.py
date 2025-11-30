@@ -80,8 +80,8 @@ class BaseRLAviary(BaseAviary):
                 print("[ERROR] in BaseRLAviary.__init()__, no controller is available for the specified drone_model")
         self.obstacles_info = [{"position": [0,0,100], "size": [0.1,0.1,0.1]}]
         self.target = np.array([0.0, 0.0, 0.0])
-        self.bounds = np.array([[-2, 2],        # X min/max
-                                [-2, 2],        # Y min/max
+        self.bounds = np.array([[-3, 3],        # X min/max
+                                [-3, 3],        # Y min/max
                                 [0.0, 2.0]])    # Z min/max
         self.current_waypoint = np.array([0.0, 0.0, 0.0])
         self.incentive_options = incentive_options
