@@ -46,22 +46,23 @@ DEFAULT_MA = False
 DEFAULT_ALGO = "PPO" # "PPO" or "TD3" RL algorithm
 DEFAULT_ACT = ActionType('pid') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
 DEFAULT_INCENTIVE_OPTIONS = {
-    # ---------- Reward Function ----------
+    # ---------- Exploration Task ----------
     # "new_voxel_reward": True, # Reward for exploring a new voxel
     # "out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
     # "change_direction_penalty": True, # Penalty for changing direction abruptly
-    # "collision_penalty": True, # Penalty for colliding with obstacles
-    "time_penalty": True, # Penalty for time taken to encourage faster exploration
+    # "exploration_percentage": True, # provide additional observation of percentage explored
+    # "nearest_unexplored_voxel": True, # provide additional observation of position of nearest unexplored voxel
 
     # ---------- Search Task ----------
     "search": True, # Reward for getting closer to target
+    "direction_to_obstacle": True, # provide additional observation of direction to target
+    "collision_penalty": True, # Penalty for colliding with obstacles
+    "time_penalty": True, # Penalty for time taken to encourage faster exploration
 
     # ---------- Environment Options ----------
-    # "construct_obstacles": True # construct obstacles in the environment
-
-    # ---------- Observation (State) Options ----------
-    # "exploration_percentage": True, # provide additional observation of percentage explored
-    # "nearest_unexplored_voxel": True, # provide additional observation of position of nearest unexplored voxel
+    # "construct_long_wall_obstacles": True, # For exploration task
+    # "construct_short_wall_obstacles": True, # For searching task
+    "construct_ball_obstacles": True # For searching task, can couple with "direction_to_obstacle" option
 }
 
 def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_FOLDER, gui=DEFAULT_GUI, plot=True, colab=DEFAULT_COLAB, record_video=DEFAULT_RECORD_VIDEO, local=True, incentive_options=DEFAULT_INCENTIVE_OPTIONS):
@@ -98,7 +99,7 @@ def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_F
         model = PPO(
             'MlpPolicy',
             train_env,
-            ent_coef=0.05,
+            ent_coef=0.1,
             verbose=1,
             policy_kwargs=dict(net_arch=[256,256,128])
         )

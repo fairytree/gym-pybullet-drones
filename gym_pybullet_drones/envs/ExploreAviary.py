@@ -135,11 +135,14 @@ class ExploreAviary(BaseRLAviary):
 
 
         if self.incentive_options.get("search", False):
-            dist = np.linalg.norm(self.target - current_pos)**2
-            reward += max(0, 2 - dist)
-            if dist < 0.1:
-                reward += 500
-
+            dist = np.linalg.norm(self.target - current_pos)
+            
+            # baseline reward for being closer
+            reward += max(0, 3 - dist**2)
+            
+            # smooth exponential bonus: closer implies higher reward
+            reward += 100 * np.exp(-dist * 3)
+            
         return reward
 
     ################################################################################
@@ -331,3 +334,41 @@ class ExploreAviary(BaseRLAviary):
         k = idx1d % self.nz
         pos = np.array([i, j, k]) * self.grid_size + self.bounds[:,0]
         return pos
+
+    ################################################################################
+
+    def _obstacle_directions(self):
+        """Compute repulsive vectors from obstacles to the drone, stronger when closer."""
+        state = self._getDroneStateVector(0)
+        current_pos = state[0:3]
+
+        directions = []
+        for obs in self.obstacles_info:
+            obs_pos = np.array(obs["position"])
+            vec = current_pos - obs_pos  # points away from obstacle
+            dist = np.linalg.norm(vec)
+            vec = vec / (dist + 1e-6) # unit direction
+            scale = 0.3
+            strength = 1 - np.tanh(dist / scale)  # stronger when closer, decays faster with distance
+            vec = vec * strength
+            directions.append(vec)
+                
+        return np.concatenate(directions) if directions else np.zeros(0)
+
+    ################################################################################
+
+    def _obstacle_repulsion(self, radius=5.0):
+        # Compute cumulative repulsive vector from obstacles within a certain radius.
+        state = self._getDroneStateVector(0)
+        current_pos = state[0:3]
+
+        repulsion = np.zeros(3)
+        for obs in self.obstacles_info:
+            obs_pos = np.array(obs["position"])
+            vec = current_pos - obs_pos
+            dist = np.linalg.norm(vec)
+            if 1e-6 < dist < radius:
+                repulsion += (vec / (dist + 1e-6))
+        return np.clip(repulsion, -1, 1)
+
+

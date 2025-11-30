@@ -111,17 +111,50 @@ class BaseRLAviary(BaseAviary):
         Overrides BaseAviary's method.
 
         """
-        walls = [
+
+        # --------- For exploration task ----------
+        long_walls = [
             {"position": [1.0, 0.0, 0.25], "size": [0.5, 0.1, 0.5], "color": [0.8, 0.8, 0.8, 1.0]},
             {"position": [-0.5, 0.5, 0.25], "size": [0.1, 2.0, 0.5], "color": [1.0, 0.5, 0.5, 1.0]},
             {"position": [-2.5, 0.0, 0.25], "size": [1.5, 0.25, 0.5], "color": [0.3, 0.9, 0.3, 1.0]},
             {"position": [-1.5, -1.0, 0.125], "size": [0.25, 0.5, 0.25], "color": [0.5, 0.5, 1.0, 1.0]}
         ]
 
-        if self.incentive_options.get("construct_obstacles", False):
-            for wall in walls:
+        # --------- For searching task ----------
+        short_walls = [
+            {"position": [1.0, 0.0, 0.25], "size": [0.5, 0.1, 0.5], "color": [0.8, 0.8, 0.8, 1.0]},
+            {"position": [-0.5, 0.5, 0.25], "size": [0.1, 3.0, 1.0], "color": [1.0, 0.5, 0.5, 1.0]},
+            {"position": [-2.5, 0.0, 0.25], "size": [1.5, 0.25, 0.5], "color": [0.3, 0.9, 0.3, 1.0]},
+            {"position": [-1.5, -0.5, 0.125], "size": [0.5, 0.25, 0.25], "color": [0.5, 0.5, 1.0, 1.0]}
+        ]
+
+        # --------- For searching task ----------
+        balls = [
+            {"position": [1.0, 0.0, 0.25], "size": 0.25, "color": [0.8, 0.8, 0.8, 1.0]},
+            {"position": [-1.0, -1.0, 0.25], "size": 0.25, "color": [1.0, 0.5, 0.5, 1.0]},
+            {"position": [-2.5, 0.0, 0.25], "size": 0.25, "color": [0.3, 0.9, 0.3, 1.0]},
+            {"position": [-1.5, -0.5, 0.25], "size": 0.25, "color": [0.5, 0.5, 1.0, 1.0]}
+        ]
+
+        self.obstacles_info = []
+        if self.incentive_options.get("construct_long_wall_obstacles", False):
+            for wall in long_walls:
                 self.create_wall(position=wall["position"], size=wall["size"], color=wall["color"])
                 self.obstacles_info.append({"position": wall["position"], "size": wall["size"]})
+        if self.incentive_options.get("construct_short_wall_obstacles", False):
+            for wall in short_walls:
+                self.create_wall(position=wall["position"], size=wall["size"], color=wall["color"])
+                self.obstacles_info.append({"position": wall["position"], "size": wall["size"]})
+        if self.incentive_options.get("construct_ball_obstacles", False):
+            for ball in balls:
+                col_shape = p.createCollisionShape(p.GEOM_SPHERE, radius=ball["size"])
+                vis_shape = p.createVisualShape(p.GEOM_SPHERE, radius=ball["size"], rgbaColor=ball["color"])
+                body_id = p.createMultiBody(baseMass=0,  # static obstacle
+                                            baseCollisionShapeIndex=col_shape,
+                                            baseVisualShapeIndex=vis_shape,
+                                            basePosition=ball["position"])
+                self.obstacles_info.append({"position": ball["position"], "size": ball["size"], "body_id": body_id})
+
 
         self.target = np.array([-1.8, -1.0, .1])
         duck_id = p.loadURDF("duck_vhacd.urdf",
@@ -340,6 +373,8 @@ class BaseRLAviary(BaseAviary):
                 extra_obs_size += 4  # vec (3) + distance
             if self.incentive_options.get("exploration_percentage", False):
                 extra_obs_size += 1
+            if self.incentive_options.get("direction_to_obstacle", False):
+                extra_obs_size += 3 * len(self.obstacles_info)  # vec (3) to each obstacle
 
             if extra_obs_size > 0:
                 obs_lower_bound = np.hstack([obs_lower_bound, np.array([[act_lo]*extra_obs_size for _ in range(self.NUM_DRONES)])])
@@ -396,6 +431,8 @@ class BaseRLAviary(BaseAviary):
                 extra_size += 4  # vector3 + distance
             if self.incentive_options.get("exploration_percentage", False):
                 extra_size += 1
+            if self.incentive_options.get("direction_to_obstacle", False):
+                extra_size += 3 * len(self.obstacles_info)  # directional vector to each obstacle
 
             if extra_size > 0:
                 extra_obs_arr = np.zeros((self.NUM_DRONES, extra_size), dtype=np.float32)
@@ -408,6 +445,10 @@ class BaseRLAviary(BaseAviary):
                         offset += 4
                     if self.incentive_options.get("exploration_percentage", False):
                         extra_obs_arr[i, offset] = self._exploration_percentage()
+                    if self.incentive_options.get("direction_to_obstacle", False):
+                        obs_count = len(self.obstacles_info)
+                        extra_obs_arr[i, offset:offset + 3 * obs_count] = self._obstacle_directions()
+                        offset += 3 * obs_count
                 ret = np.hstack([ret, extra_obs_arr])
 
             return ret
