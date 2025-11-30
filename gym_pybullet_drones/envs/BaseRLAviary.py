@@ -136,8 +136,9 @@ class BaseRLAviary(BaseAviary):
                 self.obstacles_info.append({"position": wall["position"], "size": wall["size"]})
 
         
-        
-        self.target = np.array([np.random.uniform(low=-1.0, high=1.0), np.random.uniform(low=-1.0, high=1.0), .1])
+        _theta=np.random.random()*2*np.pi
+
+        self.target = np.array([2.0*np.cos(_theta), 2*np.sin(_theta), .1])
         duck_id = p.loadURDF("duck_vhacd.urdf",
             self.target,
             p.getQuaternionFromEuler([0, 0, 0]),
