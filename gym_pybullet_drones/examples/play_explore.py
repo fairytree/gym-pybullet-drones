@@ -6,6 +6,7 @@ import pybullet as p
 from stable_baselines3 import PPO, TD3
 from gym_pybullet_drones.envs.ExploreAviary import ExploreAviary
 from gym_pybullet_drones.envs.MultiHoverAviary import MultiHoverAviary
+from gym_pybullet_drones.envs.SingleDroneActionWrapper import SingleDroneActionWrapper
 from gym_pybullet_drones.utils.enums import ObservationType, ActionType
 from gym_pybullet_drones.utils.Logger import Logger
 from gym_pybullet_drones.utils.utils import sync
@@ -22,7 +23,7 @@ DEFAULT_ACT = ActionType('pid')  # 'rpm' for RL to output rpm directly or 'pid' 
 DEFAULT_INCENTIVE_OPTIONS = {
     # ---------- Reward Function ----------
     # "new_voxel_reward": True, # Reward for exploring a new voxel
-    "out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
+    #"out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
     # "change_direction_penalty": True, # Penalty for changing direction abruptly
     # "collision_penalty": True, # Penalty for colliding with obstacles
     "time_penalty": True, # Penalty for time taken to encourage faster exploration
@@ -57,7 +58,7 @@ def play(model_path=DEFAULT_MODEL_PATH, algo=DEFAULT_ALGO, multiagent=DEFAULT_MA
 
     #### Create test environment ####
     if not multiagent:
-        env = ExploreAviary(gui=gui, obs=DEFAULT_OBS, act=DEFAULT_ACT, incentive_options=incentive_options)
+        env = SingleDroneActionWrapper(ExploreAviary(gui=gui, obs=DEFAULT_OBS, act=DEFAULT_ACT, incentive_options=incentive_options))
     else:
         env = MultiHoverAviary(gui=gui, num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT)
 
@@ -67,7 +68,7 @@ def play(model_path=DEFAULT_MODEL_PATH, algo=DEFAULT_ALGO, multiagent=DEFAULT_MA
                     colab=False)
 
     #### Run the simulation ####
-    obs, _ = env.reset(seed=42, options={})
+    obs, _ = env.reset(options={})
     start = time.time()
 
     # Initialize trajectory and drawn voxels

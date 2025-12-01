@@ -9,6 +9,8 @@ from gym_pybullet_drones.envs.BaseAviary import BaseAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType, ImageType
 from gym_pybullet_drones.control.DSLPIDControl import DSLPIDControl
 
+DISTANCE_BUFFER_SIZE=15
+
 class BaseRLAviary(BaseAviary):
     """Base single and multi-agent environment class for reinforcement learning."""
     
@@ -100,6 +102,13 @@ class BaseRLAviary(BaseAviary):
                          user_debug_gui=False, # Remove of RPM sliders from all single agent learning aviaries
                          vision_attributes=vision_attributes,
                          )
+        
+        if self.incentive_options.get("search",False):
+            self.distance_buffer=np.full(DISTANCE_BUFFER_SIZE, np.linalg.norm(self.target))
+            self.delta_diff_buff=np.full(DISTANCE_BUFFER_SIZE-1, np.linalg.norm(self.target))
+            self.delta_delta_diff_buff=np.full(DISTANCE_BUFFER_SIZE-2, np.linalg.norm(self.target))
+
+        
         #### Set a limit on the maximum target speed ###############
         if act == ActionType.VEL:
             self.SPEED_LIMIT = 0.03 * self.MAX_SPEED_KMH * (1000/3600)
@@ -356,7 +365,7 @@ class BaseRLAviary(BaseAviary):
             if self.incentive_options.get("exploration_percentage", False):
                 extra_obs_size += 1
             if self.incentive_options.get("search",False):
-                extra_obs_size+=1
+                extra_obs_size+=3*DISTANCE_BUFFER_SIZE-3
 
             if extra_obs_size > 0:
                 obs_lower_bound = np.hstack([obs_lower_bound, np.array([[act_lo]*extra_obs_size for _ in range(self.NUM_DRONES)])])
@@ -414,7 +423,7 @@ class BaseRLAviary(BaseAviary):
             if self.incentive_options.get("exploration_percentage", False):
                 extra_size += 1
             if self.incentive_options.get("search", False):
-                extra_size += 1
+                extra_size += 3*DISTANCE_BUFFER_SIZE-3
 
             if extra_size > 0:
                 extra_obs_arr = np.zeros((self.NUM_DRONES, extra_size), dtype=np.float32)
@@ -429,8 +438,28 @@ class BaseRLAviary(BaseAviary):
                         extra_obs_arr[i, offset] = self._exploration_percentage()
                         offset += 1
                     if self.incentive_options.get("search", False):
-                        extra_obs_arr[i, offset] = np.linalg.norm(self.pos-self.target)
-                        offset += 1
+                        #store values
+                        new_dist=np.linalg.norm(self.pos-self.target)
+                        last_dist=self.distance_buffer[-1]
+                        last_d_dist = self.delta_diff_buff[-1]
+
+                        #clean dist and add
+                        self.distance_buffer[:-1]=self.distance_buffer[1:]
+                        self.distance_buffer[-1] = new_dist
+
+                        #clean ddist and add
+                        new_d_dist = last_dist-new_dist
+                        self.delta_diff_buff[:-1]=self.delta_diff_buff[1:]
+                        self.delta_diff_buff[-1] = new_d_dist        
+
+                        #clean ddist and add
+                        self.delta_delta_diff_buff[:-1]=self.delta_delta_diff_buff[1:]
+                        self.delta_delta_diff_buff[-1] = last_d_dist-new_d_dist
+
+                        concat=np.concatenate([self.distance_buffer, self.delta_diff_buff, self.delta_delta_diff_buff])
+
+                        extra_obs_arr[i, offset:offset+concat.size] = concat
+                        offset += concat.size
                 ret = np.hstack([ret, extra_obs_arr])
 
             return ret

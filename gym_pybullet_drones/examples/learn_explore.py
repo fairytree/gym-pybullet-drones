@@ -31,6 +31,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from gym_pybullet_drones.utils.Logger import Logger
 from gym_pybullet_drones.envs.ExploreAviary import ExploreAviary
 from gym_pybullet_drones.envs.MultiHoverAviary import MultiHoverAviary
+from gym_pybullet_drones.envs.SingleDroneActionWrapper import SingleDroneActionWrapper
 from gym_pybullet_drones.utils.utils import sync, str2bool
 from gym_pybullet_drones.utils.enums import ObservationType, ActionType
 from stable_baselines3.common.noise import NormalActionNoise
@@ -44,14 +45,14 @@ DEFAULT_OBS = ObservationType('kin') # 'kin' or 'rgb'
 DEFAULT_AGENTS = 2
 DEFAULT_MA = False
 
-DEFAULT_ENVS = 1
+DEFAULT_ENVS = 12
 
 DEFAULT_ALGO = "TD3" # "PPO" or "TD3" RL algorithm
 DEFAULT_ACT = ActionType('pid') # 'rpm' or 'pid' or 'vel' or 'one_d_rpm' or 'one_d_pid'
 DEFAULT_INCENTIVE_OPTIONS = {
     # ---------- Reward Function ----------
     # "new_voxel_reward": True, # Reward for exploring a new voxel
-    "out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
+    # "out_of_boundary_penalty": True, # Penalty for going out of predefined boundaries
     # "change_direction_penalty": True, # Penalty for changing direction abruptly
     # "collision_penalty": True, # Penalty for colliding with obstacles
     "time_penalty": True, # Penalty for time taken to encourage faster exploration
@@ -74,12 +75,12 @@ def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_F
         os.makedirs(filename+'/')
 
     if not multiagent:
-        train_env = make_vec_env(ExploreAviary,
-                                 env_kwargs=dict(obs=DEFAULT_OBS, act=DEFAULT_ACT,incentive_options=incentive_options),
-                                 n_envs=DEFAULT_ENVS,
-                                 seed=0
-                                 )
-        eval_env = ExploreAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, incentive_options=incentive_options)
+        def make_EA_env():
+            env = ExploreAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT,incentive_options=incentive_options)
+            env = SingleDroneActionWrapper(env)
+            return env
+        train_env = make_vec_env(make_EA_env, n_envs=DEFAULT_ENVS)
+        eval_env = SingleDroneActionWrapper(ExploreAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT, incentive_options=incentive_options))
     else:
         train_env = make_vec_env(MultiHoverAviary,
                                  env_kwargs=dict(num_drones=DEFAULT_AGENTS, obs=DEFAULT_OBS, act=DEFAULT_ACT),
@@ -176,11 +177,11 @@ def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_F
 
     #### Show (and record a video of) the model's performance ##
     if not multiagent:
-        test_env = ExploreAviary(gui=gui,
+        test_env = SingleDroneActionWrapper(ExploreAviary(gui=gui,
                                obs=DEFAULT_OBS,
                                act=DEFAULT_ACT,
-                               record=record_video,incentive_options=incentive_options)
-        test_env_nogui = ExploreAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT,incentive_options=incentive_options)
+                               record=record_video,incentive_options=incentive_options))
+        test_env_nogui = SingleDroneActionWrapper(ExploreAviary(obs=DEFAULT_OBS, act=DEFAULT_ACT,incentive_options=incentive_options))
     else:
         test_env = MultiHoverAviary(gui=gui,
                                         num_drones=DEFAULT_AGENTS,
@@ -241,6 +242,10 @@ def run(algo=DEFAULT_ALGO, multiagent=DEFAULT_MA, output_folder=DEFAULT_OUTPUT_F
 
     if plot and DEFAULT_OBS == ObservationType.KIN:
         logger.plot()
+
+    
+
+    
 
 class ExternalStopCallback(BaseCallback):
     def __init__(self, stop_file="STOP", verbose=1):

@@ -4,6 +4,7 @@ import pybullet as p
 from gym_pybullet_drones.envs.BaseRLAviary import BaseRLAviary
 from gym_pybullet_drones.utils.enums import DroneModel, Physics, ActionType, ObservationType
 
+
 class ExploreAviary(BaseRLAviary):
     """Single agent RL problem: Explore a predefined area."""
 
@@ -51,7 +52,7 @@ class ExploreAviary(BaseRLAviary):
 
         """
         self.grid_size = 0.2  # discretization step in meters
-        self.EPISODE_LEN_SEC = 120
+        self.EPISODE_LEN_SEC = 20
         self.incentive_options = incentive_options
         super().__init__(drone_model=drone_model,
                          num_drones=1,
@@ -133,15 +134,16 @@ class ExploreAviary(BaseRLAviary):
 
         # time penalty
         if self.incentive_options.get("time_penalty", False):
-            reward -= 0.1
+            reward -= 0.001
 
 
         if self.incentive_options.get("search", False):
             dist = np.linalg.norm(self.target - current_pos)
-            reward += (self.last_dist-dist)
+            reward += -0.5*dist
+            reward += 6*(self.last_dist-dist)
             self.last_dist=dist
             if dist < 0.2:
-                reward += 5000
+                reward += 70.0
 
         return reward
 
