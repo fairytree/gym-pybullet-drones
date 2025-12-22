@@ -147,7 +147,7 @@ class BaseRLAviary(BaseAviary):
         
         _theta=np.random.random()*2*np.pi
 
-        self.target = np.array([2.0*np.cos(_theta), 2*np.sin(_theta), .1])
+        self.target = np.array([2.3*np.cos(_theta), 2.3*np.sin(_theta), .1])
         duck_id = p.loadURDF("duck_vhacd.urdf",
             self.target,
             p.getQuaternionFromEuler([0, 0, 0]),
